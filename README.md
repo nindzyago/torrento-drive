@@ -37,7 +37,8 @@ On the TV open Google Play (the Amazon Appstore on Fire TV), search for **Downlo
 3. That's it: press **Speak** and say a title, or type it. Rutor works right away; for
    RuTracker press **Trackers** and sign in on its own website.
 
-If TorrServer isn't running, the home screen says so and tells you what to do:
+If TorrServe isn't installed, the home screen offers an **Install TorrServe** button that
+downloads and installs it for you; if its server isn't running, it tells you what to do:
 
 ![TorrServer is not running](docs/screenshots/setup.jpg)
 

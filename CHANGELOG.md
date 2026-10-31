@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.1
+
+- "Install TorrServe" button on the home screen: downloads the latest TorrServe from GitHub
+  and installs it; the hint also gives its Downloader code.
+
 ## 0.2.0
 
 - First public release.

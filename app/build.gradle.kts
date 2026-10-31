@@ -15,8 +15,8 @@ android {
         applicationId = "io.github.nindzyago.torrentodrive"
         minSdk = 28
         targetSdk = 36
-        versionCode = 2
-        versionName = "0.2.0"
+        versionCode = 3
+        versionName = "0.2.1"
     }
 
     // Release key: from environment variables (CI) or keystore.properties (your machine, git-ignored).

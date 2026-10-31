@@ -11,7 +11,10 @@
     <string name="server_checking">TorrServer…</string>
     <string name="server_setup_title">Для просмотра нужен TorrServer</string>
     <string name="server_setup_start">TorrServe установлен, но его сервер не запущен. Открой TorrServe и запусти сервер — этот экран заметит сам.</string>
-    <string name="server_setup_install">Установи TorrServe на этот телевизор: в приложении Downloader открой github.com/YouROK/TorrServe/releases, поставь APK и запусти в нём сервер. Этот экран заметит сам.</string>
+    <string name="server_setup_install">TorrServe не установлен. Нажми кнопку — он скачается и установится сам. Или введи в приложении Downloader код %1$s.</string>
+    <string name="install_torrserve">Установить TorrServe</string>
+    <string name="torrserve_downloading">Скачиваю TorrServe…</string>
+    <string name="torrserve_failed">Не получилось — ещё раз</string>
     <string name="open_torrserve">Открыть TorrServe</string>
     <string name="update_available">Обновить до %1$s</string>
     <string name="update_downloading">Скачиваю обновление…</string>

@@ -12,7 +12,10 @@
     <string name="server_checking">TorrServer…</string>
     <string name="server_setup_title">TorrServer is needed to play torrents</string>
     <string name="server_setup_start">TorrServe is installed, but its server isn\'t running. Open TorrServe and start the server — this screen will notice by itself.</string>
-    <string name="server_setup_install">Install TorrServe on this TV: in the Downloader app open github.com/YouROK/TorrServe/releases, install the APK, then start its server. This screen will notice by itself.</string>
+    <string name="server_setup_install">TorrServe isn\'t installed on this TV. Press the button — it downloads and installs by itself. Or enter the code %1$s in the Downloader app.</string>
+    <string name="install_torrserve">Install TorrServe</string>
+    <string name="torrserve_downloading">Downloading TorrServe…</string>
+    <string name="torrserve_failed">Didn\'t work — try again</string>
     <string name="open_torrserve">Open TorrServe</string>
     <string name="update_available">Update to %1$s</string>
     <string name="update_downloading">Downloading update…</string>

@@ -1,6 +1,8 @@
 package io.github.nindzyago.torrentodrive.ui
 
 import android.Manifest
+import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.view.ViewGroup
@@ -77,6 +79,7 @@ import io.github.nindzyago.torrentodrive.WatchEntry
 import io.github.nindzyago.torrentodrive.WatchHistory
 import io.github.nindzyago.torrentodrive.Progress
 import io.github.nindzyago.torrentodrive.WatchProgress
+import io.github.nindzyago.torrentodrive.ApkInstaller
 import io.github.nindzyago.torrentodrive.Update
 import io.github.nindzyago.torrentodrive.Updates
 import io.github.nindzyago.torrentodrive.torrserver.TorrServerClient
@@ -489,8 +492,17 @@ private data class UpdateState(val update: Update, val busy: Boolean = false, va
 @Composable
 private fun ServerSetup() {
     val context = LocalContext.current
-    val pm = context.packageManager
-    val launch = remember { pm.getLeanbackLaunchIntentForPackage(TORRSERVE) ?: pm.getLaunchIntentForPackage(TORRSERVE) }
+    val scope = rememberCoroutineScope()
+    var launch by remember { mutableStateOf(torrServeLaunch(context)) }
+    // notice TorrServe being installed while the card is on screen
+    LaunchedEffect(Unit) {
+        while (launch == null) {
+            delay(2000)
+            launch = torrServeLaunch(context)
+        }
+    }
+    var installing by remember { mutableStateOf(false) }
+    var failed by remember { mutableStateOf(false) }
     Column(
         Modifier
             .padding(top = 24.dp)
@@ -501,18 +513,45 @@ private fun ServerSetup() {
         Text(stringResource(R.string.server_setup_title), fontSize = 17.sp, fontWeight = FontWeight.Bold, color = Palette.Text)
         Spacer(Modifier.height(8.dp))
         Text(
-            stringResource(if (launch != null) R.string.server_setup_start else R.string.server_setup_install),
+            stringResource(if (launch != null) R.string.server_setup_start else R.string.server_setup_install, TORRSERVE_CODE),
             fontSize = 13.sp, color = Palette.Muted, lineHeight = 19.sp,
         )
-        if (launch != null) {
-            Spacer(Modifier.height(14.dp))
-            TvButton(stringResource(R.string.open_torrserve), { context.startActivity(launch) })
+        Spacer(Modifier.height(14.dp))
+        val open = launch
+        if (open != null) {
+            TvButton(stringResource(R.string.open_torrserve), { context.startActivity(open) }, primary = true)
+        } else {
+            val label = when {
+                installing -> R.string.torrserve_downloading
+                failed -> R.string.torrserve_failed
+                else -> R.string.install_torrserve
+            }
+            TvButton(stringResource(label), {
+                if (!installing) scope.launch {
+                    installing = true
+                    failed = false
+                    val apk = ApkInstaller.latestRelease(TORRSERVE_REPO)?.second ?: TORRSERVE_APK
+                    failed = runCatching { ApkInstaller.install(context, apk) }.isFailure
+                    installing = false
+                }
+            }, primary = true, icon = Icon.Download)
         }
     }
 }
 
+private fun torrServeLaunch(context: Context): Intent? = context.packageManager.run {
+    getLeanbackLaunchIntentForPackage(TORRSERVE) ?: getLaunchIntentForPackage(TORRSERVE)
+}
+
 /** Package of TorrServe, the Android app that runs TorrServer. */
 private const val TORRSERVE = "ru.yourok.torrserve"
+
+/** Where TorrServe comes from: the latest release's APK, or this one if GitHub can't be asked. */
+private const val TORRSERVE_REPO = "YouROK/TorrServe"
+private const val TORRSERVE_APK = "https://github.com/YouROK/TorrServe/releases/download/MatriX.143.Client/TorrServe_MatriX.143.Client.apk"
+
+/** Downloader (AFTVnews) code of [TORRSERVE_APK], for installing it by hand. */
+private const val TORRSERVE_CODE = "7055456"
 
 /**
  * "Continue watching" collapsed to a title with a chevron at the bottom of the home screen;
