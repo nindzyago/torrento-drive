@@ -40,11 +40,7 @@ this step Torrento Drive will keep saying *"TorrServer is not running"*.
 2. In the menu on the left choose **Update**, then press **Install / Update server** and wait
    a few seconds.
 3. Done when the address **localhost:8090** at the top left turns green and the server
-   version (*MatriX.…*) appears under it:
-
-   ![TorrServe: Update → Install / Update server](docs/screenshots/torrserve-update.jpg)
-
-   *(TorrServe follows the TV language; the screenshot is from a Russian TV.)*
+   version (*MatriX.…*) appears under it.
 4. Recommended: in TorrServe **Settings** turn on **Start Server on Boot**, so the server is
    running after the TV restarts too.
 5. Press the remote's **Home** button — the server keeps running in the background.
