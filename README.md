@@ -23,7 +23,7 @@ On the TV open Google Play (the Amazon Appstore on Fire TV), search for **Downlo
 
 ### 2. Install TorrServe
 
-1. Open Downloader. In the field *Enter a URL or Search Term* type the code **`TS_CODE`** and
+1. Open Downloader. In the field *Enter a URL or Search Term* type the code **`7055456`** and
    press **Go**.
 2. The APK downloads. If Android asks whether Downloader may install apps, open the settings it
    offers, allow it, go back and press **Install**.
@@ -32,7 +32,7 @@ On the TV open Google Play (the Amazon Appstore on Fire TV), search for **Downlo
 
 ### 3. Install Torrento Drive
 
-1. Back in Downloader, type the code **`TD_CODE`** and press **Go**, then **Install**.
+1. Back in Downloader, type the code **`6719325`** and press **Go**, then **Install**.
 2. Open Torrento Drive from the TV's app list. Allow the microphone for voice search.
 3. That's it: press **Speak** and say a title, or type it. Rutor works right away; for
    RuTracker press **Trackers** and sign in on its own website.
