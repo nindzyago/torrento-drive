@@ -27,18 +27,38 @@ On the TV open Google Play (the Amazon Appstore on Fire TV), search for **Downlo
    press **Go**.
 2. The APK downloads. If Android asks whether Downloader may install apps, open the settings it
    offers, allow it, go back and press **Install**.
-3. Open TorrServe and make sure its server is running. If it offers to install or update the
-   server, agree.
+3. On newer TVs Google Play Protect may say *"Unsafe app blocked — This app was built for an
+   older version of Android"*. That is about TorrServe's age, not a virus: open
+   **More details** and press **Install anyway**.
 
-### 3. Install Torrento Drive
+### 3. Start the TorrServer inside TorrServe
+
+TorrServe is only a shell — the server itself has to be installed and started once. Without
+this step Torrento Drive will keep saying *"TorrServer is not running"*.
+
+1. Open **TorrServe**.
+2. In the menu on the left choose **Update**, then press **Install / Update server** and wait
+   a few seconds.
+3. Done when the address **localhost:8090** at the top left turns green and the server
+   version (*MatriX.…*) appears under it:
+
+   ![TorrServe: Update → Install / Update server](docs/screenshots/torrserve-update.jpg)
+
+   *(TorrServe follows the TV language; the screenshot is from a Russian TV.)*
+4. Recommended: in TorrServe **Settings** turn on **Start Server on Boot**, so the server is
+   running after the TV restarts too.
+5. Press the remote's **Home** button — the server keeps running in the background.
+
+### 4. Install Torrento Drive
 
 1. Back in Downloader, type the code **`6719325`** and press **Go**, then **Install**.
 2. Open Torrento Drive from the TV's app list. Allow the microphone for voice search.
 3. That's it: press **Speak** and say a title, or type it. Rutor works right away; for
    RuTracker press **Trackers** and sign in on its own website.
 
-If TorrServe isn't installed, the home screen offers an **Install TorrServe** button that
-downloads and installs it for you; if its server isn't running, it tells you what to do:
+You can also install Torrento Drive first: if TorrServe isn't there, the home screen has an
+**Install TorrServe** button that downloads and installs it (then do step 3). If the server
+isn't running, the home screen says so:
 
 ![TorrServer is not running](docs/screenshots/setup.jpg)
 
