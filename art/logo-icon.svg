@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet">
+<defs>
+<linearGradient id="chr" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset=".42" stop-color="#cfd6dd"/><stop offset=".5" stop-color="#4a5361"/><stop offset=".58" stop-color="#eef2f6"/><stop offset="1" stop-color="#8d98a4"/></linearGradient>
+<linearGradient id="trail" x1="1" y1="0" x2="0" y2="0"><stop offset="0" stop-color="#ff8a00"/><stop offset="1" stop-color="#ff3d00" stop-opacity="0"/></linearGradient>
+<linearGradient id="trailY" x1="1" y1="0" x2="0" y2="0"><stop offset="0" stop-color="#ffc400"/><stop offset="1" stop-color="#ffc400" stop-opacity="0"/></linearGradient>
+<radialGradient id="glow" cx=".4" cy=".55" r=".6"><stop offset="0" stop-color="#ff6a00" stop-opacity=".25"/><stop offset="1" stop-color="#ff6a00" stop-opacity="0"/></radialGradient>
+<clipPath id="r"><rect width="100" height="100" rx="18"/></clipPath>
+</defs>
+<g clip-path="url(#r)">
+<rect width="100" height="100" fill="#0c1018"/>
+<rect width="100" height="100" fill="url(#glow)"/>
+<g transform="translate(6 4) scale(.9) translate(50 50) skewX(-14) translate(-50 -50)">
+<path d="M-60 31L26 30L26 33Z" fill="url(#trail)"/>
+<path d="M-40 37L22 36L22 38Z" fill="url(#trailY)"/>
+<path d="M-50 42L26 40L26 43Z" fill="url(#trail)"/>
+<g fill="url(#chr)" stroke="#1b2029" stroke-width="1">
+<path d="M40 6H57V68C57 76 63 79 74 74L77 87C59 96 40 92 40 72Z"/>
+<path d="M24 30H78L76 42H22Z"/>
+</g>
+</g>
+</g>
+</svg>

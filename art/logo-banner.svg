@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="100%" height="100%" viewBox="0 0 320 180" preserveAspectRatio="xMidYMid meet">
+<defs>
+<linearGradient id="chr" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset=".42" stop-color="#cfd6dd"/><stop offset=".5" stop-color="#4a5361"/><stop offset=".58" stop-color="#eef2f6"/><stop offset="1" stop-color="#8d98a4"/></linearGradient>
+<linearGradient id="trail" x1="1" y1="0" x2="0" y2="0"><stop offset="0" stop-color="#ff8a00"/><stop offset="1" stop-color="#ff3d00" stop-opacity="0"/></linearGradient>
+<linearGradient id="trailY" x1="1" y1="0" x2="0" y2="0"><stop offset="0" stop-color="#ffc400"/><stop offset="1" stop-color="#ffc400" stop-opacity="0"/></linearGradient>
+<radialGradient id="glow" cx=".25" cy=".55" r=".55"><stop offset="0" stop-color="#ff6a00" stop-opacity=".28"/><stop offset="1" stop-color="#ff6a00" stop-opacity="0"/></radialGradient>
+</defs>
+<rect width="320" height="180" fill="#0c1018"/>
+<rect width="320" height="180" fill="url(#glow)"/>
+<g transform="translate(22 36) scale(1.04) translate(50 50) skewX(-14) translate(-50 -50)">
+<path d="M-60 31L26 30L26 33Z" fill="url(#trail)"/>
+<path d="M-40 37L22 36L22 38Z" fill="url(#trailY)"/>
+<path d="M-50 42L26 40L26 43Z" fill="url(#trail)"/>
+<g fill="url(#chr)" stroke="#1b2029" stroke-width="1">
+<path d="M40 6H57V68C57 76 63 79 74 74L77 87C59 96 40 92 40 72Z"/>
+<path d="M24 30H78L76 42H22Z"/>
+</g>
+</g>
+<text x="128" y="92" fill="url(#chr)" style="font:italic 900 27px 'Arial Black',Arial,sans-serif">TORRENTO</text>
+<text x="130" y="118" fill="#ff8a00" style="font:italic 700 18px Arial,sans-serif;letter-spacing:6px">DRIVE</text>
+</svg>

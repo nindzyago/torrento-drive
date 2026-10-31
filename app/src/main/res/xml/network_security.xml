@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- TorrServer streams over plain http on localhost / the home network -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>

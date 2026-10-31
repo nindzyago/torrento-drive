@@ -1,0 +1,9 @@
+.gradle/
+build/
+local.properties
+# личная картинка фона: только на диске и в APK, не в репозиторий
+app/src/main/res/drawable-nodpi/backdrop.png
+# release signing key and its passwords
+keystore.properties
+*.jks
+*.keystore
