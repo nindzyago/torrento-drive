@@ -129,9 +129,9 @@ adb shell am start -n io.github.nindzyago.torrentodrive/.MainActivity --es query
 
 ### Personal background picture
 
-Drop any image at `app/src/main/res/drawable-nodpi/backdrop.png` and rebuild: it is shown on
-the right of the screens with soft edges. The file is git-ignored, so your picture stays in
-your own build. Without it the app draws neutral night lights.
+Drop any image at `app/src/main/res/drawable-nodpi/backdrop.png` and rebuild: it replaces the
+default picture on the right of the screens, with the same soft edges. The file is git-ignored,
+so your picture stays in your own build.
 
 ## Releasing (maintainers)
 
