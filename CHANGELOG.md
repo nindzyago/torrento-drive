@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.2
+
+- New default backdrop: an original sunset scene on the right of the home screen, fading out
+  softly toward the voice button. A personal `backdrop.png` still replaces it.
+- README screenshots show the new backdrop.
+
 ## 0.2.1
 
 - "Install TorrServe" button on the home screen: downloads the latest TorrServe from GitHub
