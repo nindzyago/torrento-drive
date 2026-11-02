@@ -1,5 +1,6 @@
 .gradle/
 build/
+.cxx/
 local.properties
 # личная картинка фона: только на диске и в APK, не в репозиторий
 app/src/main/res/drawable-nodpi/backdrop.png

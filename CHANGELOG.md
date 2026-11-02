@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.3.0
+
+- Settings screen behind a gear button on the home screen: connection, trackers, TorrServer,
+  language, about. The language and trackers buttons moved there.
+- Connection to trackers: Automatic, Direct and ByeDPI (byedpi running inside the app, no VPN).
+  A check shows which trackers open and how; the home screen warns when one doesn't.
+- Trackers can be switched off; switched-off trackers take no part in searches.
+- TorrServer settings: status with the server version, open / install / reinstall TorrServe and
+  the install steps.
+- Connection methods are pluggable like trackers and languages (see CONTRIBUTING.md).
+
 ## 0.2.2
 
 - New default backdrop: an original sunset scene on the right of the home screen, fading out

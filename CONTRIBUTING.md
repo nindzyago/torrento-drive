@@ -9,8 +9,9 @@ Trackers live in `app/src/main/java/io/github/nindzyago/torrentodrive/trackers/`
 
 1. **Copy the template.** Duplicate `ExampleProvider.kt` as `YourTrackerProvider.kt` and
    rename the class.
-2. **Fill in `id` and `name`.** `id` is a stable lowercase key (it is stored in the watch
-   history — don't change it later); `name` is shown in the UI.
+2. **Fill in `id`, `name` and `site`.** `id` is a stable lowercase key (it is stored in the
+   watch history — don't change it later); `name` is shown in the UI; `site` is the home page
+   the connection check asks whether the tracker is reachable.
 3. **Implement `search(query)`.** Fetch the tracker's search page and turn each result into a
    `TorrentItem`:
 
@@ -24,8 +25,9 @@ Trackers live in `app/src/main/java/io/github/nindzyago/torrentodrive/trackers/`
    | `forum`    | optional: the tracker's section name, it improves category detection       |
    | `page`     | optional: the release page URL, used to find the poster                    |
 
-   Run network calls on `Dispatchers.IO`; the shared `Http.client` (OkHttp) sets a browser
-   User-Agent. Jsoup is available for HTML.
+   Run network calls on `Dispatchers.IO` with `Http.trackers` (OkHttp): it sets a browser
+   User-Agent and follows the connection method chosen in settings. Jsoup is available for
+   HTML.
 4. **`source(item)` (optional).** The default hands `item.link` to TorrServer as a magnet/URL.
    Override it if the tracker gives `.torrent` files only — return `TorrentSource.File(bytes)`.
 5. **`poster(item)` (optional).** Return the URL of the first picture in the release
@@ -72,7 +74,7 @@ A language is two files:
    like `"мульт"` matches every word that starts with it. Register the object in
    `Languages.all` in `lang/LanguageWords.kt`.
 
-The language button on the home screen lists every registered language. "Automatic" picks
+**Settings → Language** lists every registered language. "Automatic" picks
 the first of the system's preferred languages that the app has, else English.
 
 All language packs are used for search together, whatever the UI language is: a Russian tracker has
@@ -80,6 +82,25 @@ Russian titles even when the TV is set to English.
 
 Run `./gradlew testDebugUnitTest` and add a case for your language to
 `app/src/test/.../SearchQueryTest.kt`.
+
+## Adding a connection method
+
+A connection method is another way to reach tracker websites; **Settings → Connection** lists
+them and "Automatic" tries them in order. They live in
+`app/src/main/java/io/github/nindzyago/torrentodrive/connection/`.
+
+1. Implement `ConnectionMethod` in a new file: `id` (stable, saved in settings), `title` and
+   `description` (string resources, in every language), an optional `badge`, and
+   `start(context)`. `start` returns the local SOCKS5 proxy that tracker traffic should go
+   through, or `null` for a direct connection; it is called on every check, so make it cheap
+   once started. See `ByeDpi.kt`: it starts the byedpi core on a loopback port.
+2. Add it to `ConnectionMethods.all`. Order matters: "Automatic" tries methods from the top.
+
+Tracker requests made with `Http.trackers` and the tracker WebView follow the chosen method by
+themselves; trackers need no changes.
+
+byedpi itself is vendored unchanged in `app/src/main/cpp/byedpi` (the commit is in `COMMIT`).
+To update it, copy the new sources over and check the strategy flags in `ByeDpi.kt` still parse.
 
 ## Code style
 

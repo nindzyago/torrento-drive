@@ -10,13 +10,14 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
 /** Simple 24×24 stroke icons as in the mockups, drawn by hand without an icon library. */
-enum class Icon { Mic, Search, Play, Pause, Prev, Next, Plus, Lock, ChevronUp, ChevronDown, Download }
+enum class Icon { Mic, Search, Play, Pause, Prev, Next, Plus, Lock, ChevronUp, ChevronDown, Download, Gear, Globe, Info }
 
 @Composable
 fun TvIcon(icon: Icon, color: Color, size: Dp = 20.dp, modifier: Modifier = Modifier) {
@@ -63,6 +64,35 @@ fun TvIcon(icon: Icon, color: Color, size: Dp = 20.dp, modifier: Modifier = Modi
             Icon.ChevronDown -> {
                 drawLine(color, p(6f, 9f), p(12f, 15f), 2f * u, StrokeCap.Round)
                 drawLine(color, p(12f, 15f), p(18f, 9f), 2f * u, StrokeCap.Round)
+            }
+            Icon.Gear -> {
+                // eight teeth around a ring, with a hole in the middle
+                val teeth = Path()
+                for (i in 0 until 8) {
+                    val c = i * 45f
+                    fun at(deg: Float, r: Float): Offset {
+                        val a = Math.toRadians(deg.toDouble())
+                        return p(12f + r * kotlin.math.cos(a).toFloat(), 12f + r * kotlin.math.sin(a).toFloat())
+                    }
+                    listOf(at(c - 14f, 7.4f), at(c - 8f, 10f), at(c + 8f, 10f), at(c + 14f, 7.4f)).forEachIndexed { k, pt ->
+                        if (i == 0 && k == 0) teeth.moveTo(pt.x, pt.y) else teeth.lineTo(pt.x, pt.y)
+                    }
+                }
+                teeth.close()
+                drawPath(teeth, color, style = Stroke(width = 1.8f * u, join = StrokeJoin.Round))
+                drawCircle(color, 3f * u, p(12f, 12f), style = Stroke(width = 1.8f * u))
+            }
+            Icon.Globe -> {
+                drawCircle(color, 9f * u, p(12f, 12f), style = stroke)
+                drawOval(color, p(8f, 3f), Size(8f * u, 18f * u), style = Stroke(width = 1.6f * u))
+                drawLine(color, p(3f, 12f), p(21f, 12f), 1.6f * u)
+                drawLine(color, p(4.6f, 7.5f), p(19.4f, 7.5f), 1.4f * u)
+                drawLine(color, p(4.6f, 16.5f), p(19.4f, 16.5f), 1.4f * u)
+            }
+            Icon.Info -> {
+                drawCircle(color, 9f * u, p(12f, 12f), style = stroke)
+                drawCircle(color, 1.3f * u, p(12f, 7.8f))
+                drawLine(color, p(12f, 11f), p(12f, 17f), 2f * u, StrokeCap.Round)
             }
             Icon.Download -> {
                 drawLine(color, p(12f, 4f), p(12f, 15f), 2f * u, StrokeCap.Round)

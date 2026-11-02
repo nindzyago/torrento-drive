@@ -18,6 +18,9 @@ jobs:
           distribution: temurin
           java-version: 17
       - uses: gradle/actions/setup-gradle@v4
+      # the NDK and CMake build byedpi, the native core of the ByeDPI connection method
+      - name: Install the NDK
+        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "ndk;29.0.14206865" "cmake;3.31.6" > /dev/null
 
       - name: Check the tag matches versionName
         run: |

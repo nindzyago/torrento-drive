@@ -19,10 +19,11 @@ import java.net.URLEncoder
 class ExampleProvider(private val baseUrl: String = "https://tracker.example") : TrackerProvider {
     override val id = "example"
     override val name = "Example"
+    override val site = baseUrl
 
     override suspend fun search(query: String): List<TorrentItem> = withContext(Dispatchers.IO) {
         val q = URLEncoder.encode(query, "UTF-8")
-        val html = Http.client.newCall(Request.Builder().url("$baseUrl/search?q=$q").build()).execute().use { resp ->
+        val html = Http.trackers.newCall(Request.Builder().url("$baseUrl/search?q=$q").build()).execute().use { resp ->
             if (!resp.isSuccessful) error("$name answered HTTP ${resp.code}")
             resp.body.string()
         }
@@ -45,7 +46,7 @@ class ExampleProvider(private val baseUrl: String = "https://tracker.example") :
     // Optional: the poster is usually the first picture in the topic description.
     override suspend fun poster(item: TorrentItem): String? = withContext(Dispatchers.IO) {
         if (item.page.isEmpty()) return@withContext null
-        val html = Http.client.newCall(Request.Builder().url(item.page).build()).execute().use { it.body.string() }
+        val html = Http.trackers.newCall(Request.Builder().url(item.page).build()).execute().use { it.body.string() }
         Jsoup.parse(html, item.page).selectFirst(".description img[src]")?.absUrl("src")
     }
 }

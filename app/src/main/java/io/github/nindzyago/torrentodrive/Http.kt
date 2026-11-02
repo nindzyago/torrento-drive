@@ -1,6 +1,8 @@
 package io.github.nindzyago.torrentodrive
 
 import okhttp3.OkHttpClient
+import java.net.InetSocketAddress
+import java.net.Proxy
 import java.util.concurrent.TimeUnit
 
 object Http {
@@ -15,4 +17,16 @@ object Http {
             )
         }
         .build()
+
+    /** For tracker websites: goes the way the current connection method says (see connection.Connection). */
+    @Volatile
+    var trackers: OkHttpClient = client
+        private set
+
+    fun trackersClient(proxy: InetSocketAddress?): OkHttpClient =
+        if (proxy == null) client else client.newBuilder().proxy(Proxy(Proxy.Type.SOCKS, proxy)).build()
+
+    fun useTrackerProxy(proxy: InetSocketAddress?) {
+        trackers = trackersClient(proxy)
+    }
 }

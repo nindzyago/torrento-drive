@@ -236,6 +236,7 @@ class RutrackerWeb(context: Context) {
         const val ID = "rutracker"
         const val NAME = "RuTracker"
         private const val BASE = "https://rutracker.org"
+        const val SITE = "$BASE/forum/index.php"
         private const val KEY_USER = "user"
         private const val PAGE_TIMEOUT = 60_000L
         private const val CHALLENGE_TIMEOUT = 180_000L
@@ -269,6 +270,7 @@ class RutrackerWeb(context: Context) {
 class RutrackerProvider(private val web: RutrackerWeb) : TrackerProvider {
     override val id = RutrackerWeb.ID
     override val name = RutrackerWeb.NAME
+    override val site = RutrackerWeb.SITE
 
     override suspend fun search(query: String) = web.search(query)
 

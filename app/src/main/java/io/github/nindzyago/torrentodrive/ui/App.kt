@@ -74,6 +74,8 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import io.github.nindzyago.torrentodrive.trackers.TrackerProvider
 import io.github.nindzyago.torrentodrive.trackers.Trackers
+import io.github.nindzyago.torrentodrive.trackers.TrackerSwitches
+import io.github.nindzyago.torrentodrive.connection.Connection
 import io.github.nindzyago.torrentodrive.VoiceWarmup
 import io.github.nindzyago.torrentodrive.WatchEntry
 import io.github.nindzyago.torrentodrive.WatchHistory
@@ -97,7 +99,7 @@ import kotlinx.coroutines.launch
 
 private sealed interface Screen {
     data object Home : Screen
-    data object Trackers : Screen
+    data object Settings : Screen
     data object Listening : Screen
     data class Results(
         val query: SearchQuery,
@@ -140,6 +142,7 @@ fun App(
     val context = LocalContext.current
     val server = remember { TorrServerClient() }
     val trackers = remember { Trackers.all(rutracker) }
+    val switches = remember { TrackerSwitches(context) }
     val history = remember { WatchHistory(context) }
     val progress = remember { WatchProgress(context) }
     val searches = remember { SearchHistory(context) }
@@ -147,6 +150,7 @@ fun App(
     val scope = rememberCoroutineScope()
     var screen by remember { mutableStateOf<Screen>(Screen.Home) }
     var serverAlive by remember { mutableStateOf<Boolean?>(null) }
+    var serverVersion by remember { mutableStateOf<String?>(null) }
     val updates = remember { Updates(context.applicationContext) }
     var update by remember { mutableStateOf<UpdateState?>(null) }
     val challenge by rutracker.challenge
@@ -159,8 +163,9 @@ fun App(
         val results = Screen.Results(query)
         screen = results
         scope.launch {
+            Connection.awaitReady()
             val found = coroutineScope {
-                trackers.map { t -> async { t.name to runCatching { t.search(query.text) } } }.awaitAll()
+                trackers.filter(switches::isOn).map { t -> async { t.name to runCatching { t.search(query.text) } } }.awaitAll()
             }
             val items = found.flatMap { it.second.getOrDefault(emptyList()) }
             val notes = found.mapNotNull { (name, r) ->
@@ -172,6 +177,16 @@ fun App(
             if (screen == results) {
                 screen = results.copy(items = items.filter(query::matches).sortedByDescending { it.seeds }, notes = notes)
             }
+        }
+    }
+
+    fun installUpdate() {
+        val u = update ?: return
+        if (u.busy) return
+        update = u.copy(busy = true, failed = false)
+        scope.launch {
+            val ok = runCatching { updates.install(u.update) }.isSuccess
+            update = u.copy(busy = false, failed = !ok)
         }
     }
 
@@ -239,10 +254,15 @@ fun App(
     }
 
     LaunchedEffect(Unit) { updates.check()?.let { update = UpdateState(it) } }
+    LaunchedEffect(Unit) {
+        Connection.load(context)
+        Connection.check(context, trackers)
+    }
     // keep checking until TorrServer answers: the user may be installing or starting it right now
     LaunchedEffect(Unit) {
         while (true) {
-            serverAlive = server.isAlive()
+            serverVersion = server.version()
+            serverAlive = serverVersion != null
             if (serverAlive == true) break
             delay(3000)
         }
@@ -322,15 +342,7 @@ fun App(
                     Screen.Home -> HomeScreen(
                         serverAlive = serverAlive,
                         update = update,
-                        onUpdate = {
-                            val u = update ?: return@HomeScreen
-                            if (u.busy) return@HomeScreen
-                            update = u.copy(busy = true, failed = false)
-                            scope.launch {
-                                val ok = runCatching { updates.install(u.update) }.isSuccess
-                                update = u.copy(busy = false, failed = !ok)
-                            }
-                        },
+                        onUpdate = { installUpdate() },
                         signedIn = trackers.filter { it.requiresSignIn && it.isSignedIn }.map { it.name },
                         history = history.entries,
                         onVoice = {
@@ -342,13 +354,22 @@ fun App(
                         },
                         searches = searches,
                         onSearch = { q, src -> search(q, src) },
-                        onTrackers = { screen = Screen.Trackers },
+                        unreachable = trackers.filter { switches.isOn(it) && Connection.reach[it.id]?.let { r -> r.method == null } == true }.map { it.name },
+                        onSettings = { screen = Screen.Settings },
                         onResume = { e -> open(null, e.item, e.fileIndex) },
                         progressOf = { e -> progress.get(e.item, e.fileIndex) },
                         backEnabled = !loginOpen && !challenge,
                     )
                     Screen.Listening -> ListeningScreen(warmup, onResult = { search(it, QuerySource.Voice) }, onCancel = { screen = Screen.Home })
-                    Screen.Trackers -> TrackersScreen(trackers, onSignOut = { t -> scope.launch { t.signOut() } })
+                    Screen.Settings -> SettingsScreen(
+                        trackers = trackers,
+                        switches = switches,
+                        serverVersion = serverVersion,
+                        onSignOut = { t -> scope.launch { t.signOut() } },
+                        update = update,
+                        onUpdate = { installUpdate() },
+                        onCheckUpdates = { updates.check()?.also { update = UpdateState(it) } != null },
+                    )
                     is Screen.Results -> ResultsScreen(s, onOpen = { open(s, it) })
                     is Screen.Files -> FilesScreen(
                         s,
@@ -408,11 +429,12 @@ private fun HomeScreen(
     update: UpdateState?,
     onUpdate: () -> Unit,
     signedIn: List<String>,
+    unreachable: List<String>,
     history: List<WatchEntry>,
     searches: SearchHistory,
     onVoice: () -> Unit,
     onSearch: (String, QuerySource) -> Unit,
-    onTrackers: () -> Unit,
+    onSettings: () -> Unit,
     onResume: (WatchEntry) -> Unit,
     progressOf: (WatchEntry) -> Progress?,
     backEnabled: Boolean,
@@ -439,6 +461,12 @@ private fun HomeScreen(
             Box(Modifier.size(6.dp).background(dot, CircleShape))
             Spacer(Modifier.width(6.dp))
             Text(label, fontSize = 11.sp, color = Palette.Muted)
+            if (unreachable.isNotEmpty()) {
+                Spacer(Modifier.width(16.dp))
+                Box(Modifier.size(6.dp).background(Palette.Warn, CircleShape))
+                Spacer(Modifier.width(6.dp))
+                Text(stringResource(R.string.trackers_unreachable, unreachable.joinToString(", ")), fontSize = 11.sp, color = Palette.Warn)
+            }
             Spacer(Modifier.width(18.dp))
             if (update != null) {
                 val label = when {
@@ -449,9 +477,7 @@ private fun HomeScreen(
                 TvButton(label, onUpdate, icon = Icon.Download)
                 Spacer(Modifier.width(10.dp))
             }
-            LanguageButton()
-            Spacer(Modifier.width(10.dp))
-            TvButton(stringResource(R.string.trackers), onTrackers)
+            TvIconButton(Icon.Gear, stringResource(R.string.settings), onSettings)
         }
         Spacer(Modifier.height(48.dp))
         Text(stringResource(R.string.home_title), fontSize = 39.sp, fontWeight = FontWeight.Bold, color = Palette.Text, letterSpacing = (-0.5).sp)
@@ -486,13 +512,12 @@ private fun HomeScreen(
 }
 
 /** A newer release found on GitHub and where its installation stands. */
-private data class UpdateState(val update: Update, val busy: Boolean = false, val failed: Boolean = false)
+internal data class UpdateState(val update: Update, val busy: Boolean = false, val failed: Boolean = false)
 
 /** Shown while TorrServer doesn't answer: how to install or start TorrServe. */
 @Composable
 private fun ServerSetup() {
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
     var launch by remember { mutableStateOf(torrServeLaunch(context)) }
     // notice TorrServe being installed while the card is on screen
     LaunchedEffect(Unit) {
@@ -501,8 +526,6 @@ private fun ServerSetup() {
             launch = torrServeLaunch(context)
         }
     }
-    var installing by remember { mutableStateOf(false) }
-    var failed by remember { mutableStateOf(false) }
     Column(
         Modifier
             .padding(top = 24.dp)
@@ -521,37 +544,10 @@ private fun ServerSetup() {
         if (open != null) {
             TvButton(stringResource(R.string.open_torrserve), { context.startActivity(open) }, primary = true)
         } else {
-            val label = when {
-                installing -> R.string.torrserve_downloading
-                failed -> R.string.torrserve_failed
-                else -> R.string.install_torrserve
-            }
-            TvButton(stringResource(label), {
-                if (!installing) scope.launch {
-                    installing = true
-                    failed = false
-                    val apk = ApkInstaller.latestRelease(TORRSERVE_REPO)?.second ?: TORRSERVE_APK
-                    failed = runCatching { ApkInstaller.install(context, apk) }.isFailure
-                    installing = false
-                }
-            }, primary = true, icon = Icon.Download)
+            InstallTorrServeButton(reinstall = false)
         }
     }
 }
-
-private fun torrServeLaunch(context: Context): Intent? = context.packageManager.run {
-    getLeanbackLaunchIntentForPackage(TORRSERVE) ?: getLaunchIntentForPackage(TORRSERVE)
-}
-
-/** Package of TorrServe, the Android app that runs TorrServer. */
-private const val TORRSERVE = "ru.yourok.torrserve"
-
-/** Where TorrServe comes from: the latest release's APK, or this one if GitHub can't be asked. */
-private const val TORRSERVE_REPO = "YouROK/TorrServe"
-private const val TORRSERVE_APK = "https://github.com/YouROK/TorrServe/releases/download/MatriX.143.Client/TorrServe_MatriX.143.Client.apk"
-
-/** Downloader (AFTVnews) code of [TORRSERVE_APK], for installing it by hand. */
-private const val TORRSERVE_CODE = "7055456"
 
 /**
  * "Continue watching" collapsed to a title with a chevron at the bottom of the home screen;
@@ -644,66 +640,6 @@ private fun ProgressLine(progress: Progress, modifier: Modifier = Modifier) {
 /** "Title / Original Title (Director…) [2010, …]" → "Title": cards need a short title. */
 private fun shortTitle(title: String): String =
     title.substringBefore(" / ").substringBefore(" (").substringBefore(" [").trim().ifEmpty { title }
-
-@Composable
-private fun TrackersScreen(trackers: List<TrackerProvider>, onSignOut: (TrackerProvider) -> Unit) {
-    val firstFocus = remember { FocusRequester() }
-    LaunchedEffect(Unit) { runCatching { firstFocus.requestFocus() } }
-    val firstWithAction = trackers.firstOrNull { it.requiresSignIn }
-    Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Logo(32.dp)
-        Spacer(Modifier.height(14.dp))
-        Text(stringResource(R.string.trackers), fontSize = 27.sp, fontWeight = FontWeight.Bold, color = Palette.Text)
-        trackers.forEach { t ->
-            val ok = !t.requiresSignIn || t.isSignedIn
-            val status = when {
-                !t.requiresSignIn -> stringResource(R.string.tracker_no_login)
-                t.isSignedIn -> stringResource(R.string.tracker_connected)
-                else -> stringResource(R.string.tracker_not_connected)
-            }
-            TrackerRow(t.name, status, ok) {
-                if (t.requiresSignIn) {
-                    val focus = if (t === firstWithAction) Modifier.focusRequester(firstFocus) else Modifier
-                    if (t.isSignedIn) TvButton(stringResource(R.string.sign_out), { onSignOut(t) }, focus)
-                    else TvButton(stringResource(R.string.sign_in_on_site), t::startSignIn, focus, primary = true)
-                }
-            }
-        }
-        Row(
-            Modifier
-                .width(645.dp)
-                .border(1.dp, Palette.Line, RoundedCornerShape(11.dp))
-                .padding(horizontal = 16.dp, vertical = 13.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            TvIcon(Icon.Plus, Palette.Muted, 15.dp)
-            Spacer(Modifier.width(13.dp))
-            Column {
-                Text(stringResource(R.string.add_tracker), fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = Palette.Text)
-                Text(stringResource(R.string.add_tracker_hint), fontSize = 11.sp, color = Palette.Muted)
-            }
-        }
-    }
-}
-
-@Composable
-private fun TrackerRow(name: String, status: String, ok: Boolean, action: @Composable () -> Unit) {
-    Row(
-        Modifier
-            .width(645.dp)
-            .background(Palette.Surface, RoundedCornerShape(11.dp))
-            .padding(horizontal = 16.dp, vertical = 13.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Box(Modifier.size(8.dp).background(if (ok) Palette.Good else Palette.Accent, CircleShape))
-        Spacer(Modifier.width(13.dp))
-        Column(Modifier.weight(1f)) {
-            Text(name, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = Palette.Text)
-            Text(status, fontSize = 11.sp, color = Palette.Muted)
-        }
-        action()
-    }
-}
 
 /** Quality parsed from the torrent title, for the colored badge. */
 private fun qualityOf(title: String): Pair<String, Color>? = when {
