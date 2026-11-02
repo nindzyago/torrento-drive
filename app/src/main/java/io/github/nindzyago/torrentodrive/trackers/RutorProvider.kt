@@ -11,12 +11,13 @@ import java.net.URLEncoder
 class RutorProvider(private val baseUrl: String = "https://rutor.info") : TrackerProvider {
     override val id = "rutor"
     override val name = "Rutor"
+    override val site = baseUrl
 
     override suspend fun search(query: String): List<TorrentItem> = withContext(Dispatchers.IO) {
         val q = URLEncoder.encode(query, "UTF-8").replace("+", "%20")
         // /search/<page>/<category>/<mode>/<sort>/<query>; sort 2 = by seeders
         val request = Request.Builder().url("$baseUrl/search/0/0/100/2/$q").build()
-        val html = Http.client.newCall(request).execute().use { resp ->
+        val html = Http.trackers.newCall(request).execute().use { resp ->
             if (!resp.isSuccessful) error("Rutor answered HTTP ${resp.code}")
             resp.body.string()
         }
@@ -34,7 +35,7 @@ class RutorProvider(private val baseUrl: String = "https://rutor.info") : Tracke
     // the poster is the first image in the torrent description (#details)
     override suspend fun poster(item: TorrentItem): String? = withContext(Dispatchers.IO) {
         if (item.page.isEmpty()) return@withContext null
-        val html = Http.client.newCall(Request.Builder().url(item.page).build()).execute().use { resp ->
+        val html = Http.trackers.newCall(Request.Builder().url(item.page).build()).execute().use { resp ->
             if (!resp.isSuccessful) return@withContext null
             resp.body.string()
         }

@@ -42,7 +42,7 @@ object Posters {
             val dir = File(context.cacheDir, "posters").apply { mkdirs() }
             val file = File(dir, sha1(url))
             if (!file.exists()) {
-                Http.client.newCall(Request.Builder().url(url).build()).execute().use { resp ->
+                Http.trackers.newCall(Request.Builder().url(url).build()).execute().use { resp ->
                     if (!resp.isSuccessful) return@runCatching null
                     file.writeBytes(resp.body.bytes())
                 }

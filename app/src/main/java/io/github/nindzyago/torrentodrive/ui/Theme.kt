@@ -3,14 +3,21 @@ package io.github.nindzyago.torrentodrive.ui
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -91,6 +98,26 @@ internal fun TvButton(
             androidx.compose.foundation.layout.Spacer(Modifier.padding(start = if (large) 9.dp else 6.dp))
         }
         Text(text, fontSize = if (large) 15.sp else 12.sp, fontWeight = if (large) FontWeight.SemiBold else FontWeight.Medium, maxLines = 1, softWrap = false)
+    }
+}
+
+/** Round button with just an icon, the size of a [TvButton]; [description] is read out by accessibility services. */
+@Composable
+internal fun TvIconButton(icon: Icon, description: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    Button(
+        onClick = onClick,
+        modifier = modifier.size(34.dp).semantics { contentDescription = description },
+        shape = ButtonDefaults.shape(CircleShape),
+        contentPadding = PaddingValues(0.dp),
+        colors = ButtonDefaults.colors(
+            containerColor = Palette.Glass,
+            contentColor = Palette.Text,
+            focusedContainerColor = Palette.Accent,
+            focusedContentColor = Palette.Text,
+        ),
+        border = ButtonDefaults.border(border = Border(BorderStroke(1.dp, Palette.Line), shape = CircleShape)),
+    ) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { TvIcon(icon, Palette.Text, 18.dp) }
     }
 }
 

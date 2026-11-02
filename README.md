@@ -50,7 +50,8 @@ this step Torrento Drive will keep saying *"TorrServer is not running"*.
 1. Back in Downloader, type the code **`6719325`** and press **Go**, then **Install**.
 2. Open Torrento Drive from the TV's app list. Allow the microphone for voice search.
 3. That's it: press **Speak** and say a title, or type it. Rutor works right away; for
-   RuTracker press **Trackers** and sign in on its own website.
+   RuTracker open **Settings** (the gear at the top right) → **Trackers** and sign in on its
+   own website.
 
 You can also install Torrento Drive first: if TorrServe isn't there, the home screen has an
 **Install TorrServe** button that downloads and installs it (then do step 3). If the server
@@ -61,7 +62,7 @@ isn't running, the home screen says so:
 ### Updates
 
 The app checks GitHub for a new version when it starts and shows an **Update** button next to
-**Trackers**. Press it and confirm the installation.
+the gear. Press it and confirm the installation. **Settings → About** checks on demand.
 
 ### Without the codes
 
@@ -77,9 +78,9 @@ Or download `torrento-drive.apk` from
 
 ## Screenshots
 
-| Search history | Continue watching | Language |
+| Search history | Continue watching | Settings |
 |---|---|---|
-| ![](docs/screenshots/history.jpg) | ![](docs/screenshots/continue.jpg) | ![](docs/screenshots/language.jpg) |
+| ![](docs/screenshots/history.jpg) | ![](docs/screenshots/continue.jpg) | ![](docs/screenshots/settings.jpg) |
 
 ## Features
 
@@ -95,11 +96,29 @@ Or download `torrento-drive.apk` from
 - **Sign in on the tracker's own website.** Trackers that need an account open in a built-in
   browser with a D-pad mouse cursor; the app never sees your password, it only keeps the
   site's session cookies.
-- **Pluggable trackers and languages** — see [CONTRIBUTING.md](CONTRIBUTING.md).
+- **Settings** behind the gear: connection, trackers (switch each on or off, sign in),
+  TorrServer status and install help, language, updates.
+- **Pluggable trackers, languages and connection methods** — see
+  [CONTRIBUTING.md](CONTRIBUTING.md).
 
 Trackers included today: **RuTracker** (sign-in required) and **Rutor**.
 Languages: English and Russian. By default the app follows the system language (English if it
-doesn't have it); the flag button on the home screen switches it.
+doesn't have it); **Settings → Language** switches it.
+
+### Connection to trackers
+
+Some networks don't let you reach tracker websites. **Settings → Connection** shows which
+trackers open and how, and offers:
+
+- **Automatic** (default): directly first; if a tracker doesn't open, the other methods are
+  tried one by one and the one that works is used.
+- **Direct**: an ordinary connection.
+- **ByeDPI**: [byedpi](https://github.com/hufrea/byedpi) runs inside the app (no VPN, no extra
+  app) and changes how the start of each connection is sent, which helps where network filters
+  recognize tracker sites by name.
+
+Only searching goes this way — tracker pages, `.torrent` files and posters. Video always streams
+straight from TorrServer.
 
 ## Requirements
 
@@ -110,7 +129,8 @@ doesn't have it); the flag button on the home screen switches it.
 
 ## Build from source
 
-You need JDK 17 and the Android SDK (platform 37.2).
+You need JDK 17 and the Android SDK (platform 37.2) with NDK 29.0.14206865 and CMake 3.31.6
+(they build byedpi; `sdkmanager "ndk;29.0.14206865" "cmake;3.31.6"`).
 
 ```bash
 ./gradlew testDebugUnitTest assembleDebug
@@ -185,4 +205,5 @@ franchise.
 ## License
 
 [MIT](LICENSE). TorrServer and TorrServe are separate projects with their own licenses and
-are not bundled.
+are not bundled. [byedpi](https://github.com/hufrea/byedpi) (MIT, © hufrea) is included unchanged
+in `app/src/main/cpp/byedpi`.

@@ -50,10 +50,15 @@ data class TorrentStats(
 /** Client for the HTTP API of TorrServer (MatriX) running on the TV box itself. */
 class TorrServerClient(private val baseUrl: String = "http://127.0.0.1:8090") {
 
-    suspend fun isAlive(): Boolean = withContext(Dispatchers.IO) {
+    suspend fun isAlive(): Boolean = version() != null
+
+    /** The server's version ("MatriX.147"), or null if it doesn't answer. */
+    suspend fun version(): String? = withContext(Dispatchers.IO) {
         runCatching {
-            Http.client.newCall(Request.Builder().url("$baseUrl/echo").build()).execute().use { it.isSuccessful }
-        }.getOrDefault(false)
+            Http.client.newCall(Request.Builder().url("$baseUrl/echo").build()).execute().use { r ->
+                if (r.isSuccessful) r.body.string().trim() else null
+            }
+        }.getOrNull()
     }
 
     /** Adds a torrent to TorrServer and immediately returns its hash; metadata is fetched in the background. */

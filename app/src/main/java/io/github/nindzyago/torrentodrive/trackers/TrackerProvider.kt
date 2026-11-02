@@ -27,10 +27,16 @@ sealed interface TorrentSource {
 /** The tracker needs a signed-in session and there is none. */
 class LoginRequired(val tracker: String) : Exception("$tracker: sign-in required")
 
-/** Common tracker interface: a new tracker is a new implementation; the rest of the app stays unchanged. */
+/**
+ * Common tracker interface: a new tracker is a new implementation; the rest of the app stays unchanged.
+ * Make plain HTTP requests with Http.trackers, so they follow the connection method chosen in settings.
+ */
 interface TrackerProvider {
     val id: String
     val name: String
+
+    /** The site's home page: the connection check asks it whether the tracker is reachable. */
+    val site: String
     suspend fun search(query: String): List<TorrentItem>
     suspend fun source(item: TorrentItem): TorrentSource = TorrentSource.Link(item.link)
 
