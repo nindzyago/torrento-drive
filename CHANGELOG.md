@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.1
+
+- The backdrop no longer jumps when the on-screen keyboard opens or closes for typed search.
+- Player: the first OK press only brings up the overlay; pause is the second press. OK, then
+  up and left/right seeks without stopping the video.
+
 ## 0.3.0
 
 - Settings screen behind a gear button on the home screen: connection, trackers, TorrServer,
