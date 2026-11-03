@@ -118,6 +118,8 @@ internal fun PlayerScreen(
     var interaction by remember { mutableIntStateOf(0) }
     /** The viewer dismissed the "next episode" card for the current episode. */
     var nextDismissed by remember { mutableStateOf(false) }
+    /** OK brought up the overlay: its key-up must not reach the play button that now has focus. */
+    var swallowOkUp by remember { mutableStateOf(false) }
 
     fun save() {
         val dur = player.duration
@@ -253,6 +255,11 @@ internal fun PlayerScreen(
                     }
                     return@onPreviewKeyEvent true
                 }
+                val ok = ev.key.nativeKeyCode == AndroidKey.KEYCODE_DPAD_CENTER || ev.key.nativeKeyCode == AndroidKey.KEYCODE_ENTER
+                if (ok && ev.type == KeyEventType.KeyUp && swallowOkUp) {
+                    swallowOkUp = false
+                    return@onPreviewKeyEvent true
+                }
                 if (ev.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
                 interaction++
                 when (ev.key.nativeKeyCode) {
@@ -270,7 +277,8 @@ internal fun PlayerScreen(
                 // with the overlay, the card or an error on screen the arrows move focus between their buttons
                 if (ev.type != KeyEventType.KeyDown || controls || nextCard || error != null) return@onKeyEvent false
                 when (ev.key.nativeKeyCode) {
-                    AndroidKey.KEYCODE_DPAD_CENTER, AndroidKey.KEYCODE_ENTER -> { togglePlay(); controls = true; true }
+                    // the first OK only brings up the overlay; pause is the second press, on the focused button
+                    AndroidKey.KEYCODE_DPAD_CENTER, AndroidKey.KEYCODE_ENTER -> { controls = true; swallowOkUp = true; true }
                     AndroidKey.KEYCODE_DPAD_LEFT -> { seekBy(-SEEK_STEP_MS); controls = true; true }
                     AndroidKey.KEYCODE_DPAD_RIGHT -> { seekBy(SEEK_STEP_MS); controls = true; true }
                     AndroidKey.KEYCODE_DPAD_UP, AndroidKey.KEYCODE_DPAD_DOWN -> { controls = true; true }
