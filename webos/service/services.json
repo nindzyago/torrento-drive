@@ -1,0 +1,10 @@
+{
+  "id": "io.github.nindzyago.torrentodrive.webos.service",
+  "description": "Torrento Drive tracker search",
+  "services": [
+    {
+      "name": "io.github.nindzyago.torrentodrive.webos.service",
+      "description": "Searches torrent trackers for the app"
+    }
+  ]
+}

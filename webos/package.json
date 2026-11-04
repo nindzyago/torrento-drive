@@ -1,0 +1,12 @@
+{
+  "name": "torrento-drive-webos",
+  "version": "0.3.0",
+  "private": true,
+  "description": "Torrento Drive for LG webOS TVs",
+  "scripts": {
+    "dev": "node tools/sync-android.js && node dev-server.js",
+    "sync": "node tools/sync-android.js",
+    "package": "node tools/sync-android.js && ares-package app service -o dist",
+    "install-tv": "./install-tv.sh"
+  }
+}

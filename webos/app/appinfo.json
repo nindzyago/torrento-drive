@@ -1,0 +1,13 @@
+{
+  "id": "io.github.nindzyago.torrentodrive.webos",
+  "version": "0.3.0",
+  "vendor": "nindzyago",
+  "type": "web",
+  "main": "index.html",
+  "title": "Torrento Drive",
+  "icon": "img/icon80.png",
+  "largeIcon": "img/icon130.png",
+  "bgColor": "#14161b",
+  "resolution": "1920x1080",
+  "disableBackHistoryAPI": true
+}
