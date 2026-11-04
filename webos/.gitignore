@@ -1,0 +1,6 @@
+dist/
+node_modules/
+# copied from the Android app by tools/sync-android.js
+app/strings.js
+app/img/backdrop_default.jpg
+app/img/logo_lockup.png

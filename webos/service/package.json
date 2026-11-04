@@ -1,0 +1,6 @@
+{
+  "name": "io.github.nindzyago.torrentodrive.webos.service",
+  "version": "0.3.0",
+  "description": "Torrento Drive tracker search",
+  "main": "index.js"
+}

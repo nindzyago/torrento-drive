@@ -1,0 +1,144 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Torrento Drive</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div id="backdrop"><div id="backdrop-img"></div></div>
+<div id="shade"></div>
+
+<!-- home (ui/App.kt HomeScreen) -->
+<section id="home" class="screen active">
+  <div class="topbar">
+    <img class="logo" src="img/logo_lockup.png" alt="Torrento Drive">
+    <div class="grow"></div>
+    <span id="server-dot" class="dot"></span><span id="server-label" class="muted small"></span>
+    <button id="settings-btn" class="icon-btn focusable" data-icon="gear"></button>
+  </div>
+  <h1 data-t="home_title"></h1>
+  <div class="search-row">
+    <button id="speak" class="btn primary large focusable" data-icon="mic" data-t="speak"></button>
+    <label class="field">
+      <span class="ico" data-icon="search"></span>
+      <input id="query" class="focusable" type="text" autocomplete="off">
+    </label>
+  </div>
+  <p id="voice-hint" class="muted small hidden" data-t="speak_hint"></p>
+  <div id="suggestions" class="hidden"></div>
+  <div id="server-setup" class="card-panel hidden">
+    <div class="panel-title" data-t="server_setup_title"></div>
+    <p id="server-setup-text" class="muted"></p>
+    <button id="setup-settings" class="btn primary focusable" data-t="open_settings"></button>
+  </div>
+  <div class="grow"></div>
+  <div id="shelf">
+    <div id="shelf-handle" class="focusable" tabindex="-1"><span data-t="continue_watching"></span><span class="ico" data-icon="chevron-up"></span></div>
+    <div id="shelf-body"></div>
+  </div>
+</section>
+
+<!-- results -->
+<section id="results" class="screen dense">
+  <div class="results-head"><span id="results-query" class="h2"></span><span id="results-count" class="muted"></span></div>
+  <div id="chips" class="chips"></div>
+  <div id="results-list" class="scroll"></div>
+</section>
+
+<!-- files -->
+<section id="files" class="screen dense">
+  <div class="files-layout">
+    <aside>
+      <div id="files-poster" class="poster big"></div>
+      <div id="files-title" class="files-title"></div>
+      <div id="files-meta" class="muted small"></div>
+      <div class="files-seeds"><span id="files-seeds" class="small"></span><span id="files-tracker" class="muted small"></span></div>
+    </aside>
+    <div class="files-main">
+      <div id="files-wait">
+        <p id="files-status" class="muted lead"></p>
+        <div id="files-stats"></div>
+      </div>
+      <div id="files-ready" class="hidden">
+        <div class="files-head"><span id="files-kind" class="section-title"></span><div class="grow"></div><button id="files-continue" class="btn primary focusable hidden" data-icon="play"></button></div>
+        <div id="files-list" class="scroll"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- buffering before the player (LoadingScreen) -->
+<section id="loading" class="screen dense">
+  <div class="loading-box">
+    <div id="loading-title" class="muted small ellipsis"></div>
+    <div id="loading-file" class="loading-file"></div>
+    <div class="loading-line"><span data-t="preparing"></span><span id="loading-buffer" class="muted"></span></div>
+    <div class="bar"><div id="loading-fill"></div></div>
+    <div id="loading-stats"></div>
+    <div class="loading-actions">
+      <button id="watch-now" class="btn primary large focusable" data-icon="play" data-t="watch_now"></button>
+      <span class="muted small" data-t="player_auto"></span>
+    </div>
+  </div>
+</section>
+
+<!-- settings (ui/SettingsScreen.kt) -->
+<section id="settings" class="screen dense">
+  <div class="settings-title" data-t="settings"></div>
+  <div class="settings-layout">
+    <nav id="settings-nav">
+      <div class="nav-item focusable" tabindex="-1" data-section="connection"><span class="nav-ico" data-icon="globe"></span><span data-t="settings_connection"></span></div>
+      <div class="nav-item focusable" tabindex="-1" data-section="trackers"><span class="nav-ico" data-icon="search"></span><span data-t="trackers"></span></div>
+      <div class="nav-item focusable" tabindex="-1" data-section="torrserver"><span class="nav-ico" data-icon="play"></span><span>TorrServer</span><span class="grow"></span><span id="nav-server-dot" class="dot small-dot"></span></div>
+      <div class="nav-item focusable" tabindex="-1" data-section="language"><span class="nav-ico flag" id="nav-flag"></span><span data-t="settings_language"></span></div>
+      <div class="nav-item focusable" tabindex="-1" data-section="about"><span class="nav-ico" data-icon="info"></span><span data-t="settings_about"></span></div>
+    </nav>
+    <div id="settings-body"></div>
+  </div>
+</section>
+
+<!-- player (ui/PlayerScreen.kt) -->
+<section id="player" class="screen">
+  <video id="video" preload="auto"></video>
+  <div id="p-buffering" class="p-badge hidden"><div class="p-badge-title" data-t="player_buffering"></div><div id="p-buffer-stats" class="small"></div></div>
+  <div id="p-overlay">
+    <div id="p-top">
+      <div id="p-title" class="muted ellipsis"></div>
+      <div class="p-file-row"><span id="p-episode" class="tag hidden"></span><span id="p-file" class="ellipsis"></span></div>
+    </div>
+    <div id="p-bottom">
+      <div id="p-bar" class="p-bar focusable" tabindex="-1"><div id="p-buffered"></div><div id="p-pos"></div></div>
+      <div class="p-times"><span id="p-time"></span><span id="p-left" class="muted"></span></div>
+      <div class="p-buttons">
+        <button id="p-prev" class="btn focusable" data-icon="prev" data-t="player_prev"></button>
+        <button id="p-play" class="btn primary focusable" data-icon="pause" data-t="player_pause"></button>
+        <button id="p-next" class="btn focusable" data-icon="next" data-t="player_next"></button>
+        <span id="p-resumed" class="muted p-small hidden"></span>
+        <button id="p-from-start" class="btn focusable hidden" data-t="player_from_start"></button>
+        <span class="grow"></span>
+        <button id="p-audio" class="btn focusable hidden"></button>
+        <button id="p-subs" class="btn focusable hidden"></button>
+      </div>
+    </div>
+  </div>
+  <div id="p-next-card" class="p-next hidden">
+    <div id="p-next-in" class="p-next-in"></div>
+    <div id="p-next-label" class="p-next-label"></div>
+    <div class="p-next-buttons">
+      <button id="p-next-play" class="btn primary focusable" data-icon="next" data-t="next_play"></button>
+      <button id="p-next-cancel" class="btn focusable" data-t="next_cancel"></button>
+    </div>
+  </div>
+  <div id="p-error" class="p-error hidden">
+    <div id="p-error-text"></div>
+    <div class="p-error-buttons"><button id="p-error-back" class="btn primary focusable" data-t="player_back"></button></div>
+  </div>
+</section>
+
+<div id="toast"></div>
+<script src="strings.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
