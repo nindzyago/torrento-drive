@@ -154,4 +154,14 @@
         <item quantity="one">%d file</item>
         <item quantity="other">%d files</item>
     </plurals>
+    <string name="shelf_new">New</string>
+    <string name="shelf_popular">Popular</string>
+    <string name="shelf_all">All</string>
+    <string name="shelves_loading">Fetching new and popular releases…</string>
+    <string name="shelves_empty">The trackers haven\'t answered yet</string>
+    <string name="shelves_sign_in">%s: sign in (Settings → Trackers) to see its shelves</string>
+    <string name="shelves_error">%1$s: shelves not refreshed (%2$s)</string>
+    <string name="settings_sections">Shelves on the home screen</string>
+    <string name="settings_sections_hint">Sections of %s shown under New and Popular</string>
+    <string name="settings_sections_later">The sections show up once %s has been opened with a sign-in</string>
 </resources>

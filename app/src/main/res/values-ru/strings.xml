@@ -157,4 +157,14 @@
         <item quantity="many">%d файлов</item>
         <item quantity="other">%d файла</item>
     </plurals>
+    <string name="shelf_new">Новинки</string>
+    <string name="shelf_popular">Популярное</string>
+    <string name="shelf_all">Все</string>
+    <string name="shelves_loading">Загружаем новинки и популярное…</string>
+    <string name="shelves_empty">Пока пусто: трекеры не ответили</string>
+    <string name="shelves_sign_in">%s: войди (Настройки → Трекеры), чтобы видеть его подборки</string>
+    <string name="shelves_error">%1$s: подборки не обновились (%2$s)</string>
+    <string name="settings_sections">Подборки на главном экране</string>
+    <string name="settings_sections_hint">Разделы %s в «Новинках» и «Популярном»</string>
+    <string name="settings_sections_later">Разделы появятся, когда %s откроется после входа</string>
 </resources>

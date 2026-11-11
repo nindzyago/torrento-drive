@@ -8,6 +8,8 @@ import io.github.nindzyago.torrentodrive.trackers.TorrentItem
 import io.github.nindzyago.torrentodrive.trackers.TrackerProvider
 import io.github.nindzyago.torrentodrive.trackers.TrackerSection
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.io.File
 
@@ -165,13 +167,28 @@ class Shelves(context: Context, private val trackers: List<TrackerProvider>, pri
     /** true while some tracker's shelves are being fetched. */
     val loading = mutableStateOf(false)
 
+    /** Poster URLs found so far, by "<tracker>:<link>"; only cards that were on screen ask for one. */
+    val posters = mutableStateMapOf<String, String>()
+    private val askedPosters = mutableSetOf<String>()
+
+    suspend fun poster(item: TorrentItem) {
+        val key = "${item.trackerId}:${item.link}"
+        if (!askedPosters.add(key)) return
+        val tracker = trackers.firstOrNull { it.id == item.trackerId } ?: return
+        runCatching { tracker.poster(item) }.getOrNull()?.let { posters[key] = it }
+    }
+
     fun shelves(kind: Browse, isOn: (TrackerProvider) -> Boolean): List<Shelf> = trackers.filter(isOn).flatMap { t ->
         val batch = batches[t.id to kind] ?: return@flatMap emptyList()
         t.sections.filter { switches.isOn(t, it) }.mapNotNull { s -> batch.sections[s.id]?.takeIf { it.isNotEmpty() }?.let { Shelf(t, s, it) } }
     }
 
     /** Shows what is on disk, then refreshes what is stale. Trackers that run through a WebView go last. */
-    suspend fun refresh(isOn: (TrackerProvider) -> Boolean, force: Boolean = false) {
+    private val refreshing = Mutex()
+
+    suspend fun refresh(isOn: (TrackerProvider) -> Boolean, force: Boolean = false) = refreshing.withLock { refreshLocked(isOn, force) }
+
+    private suspend fun refreshLocked(isOn: (TrackerProvider) -> Boolean, force: Boolean) {
         trackers.forEach { t -> Browse.entries.forEach { k -> withContext(Dispatchers.IO) { cache.read(t.id, k) }?.let { batches[t.id to k] = it } } }
         loading.value = true
         try {
