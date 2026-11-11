@@ -29,13 +29,18 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.ExperimentalComposeUiApi
+import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.foundation.focusGroup
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
@@ -77,6 +82,7 @@ internal class ShelfView(
  * when focus comes to it, the panel slides up from below with the focused tab's content.
  * Continue watching keeps its card row; New and Popular show one shelf per tracker section.
  */
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 internal fun HomePanel(
     shelfView: ShelfView,
@@ -86,6 +92,8 @@ internal fun HomePanel(
     continueEmpty: Boolean,
     /** Called when [restore] found nothing to focus (the release left the shelf). */
     onRestoreFailed: () -> Unit,
+    /** The panel opened or closed: the home screen makes room for it. */
+    onOpenChange: (Boolean) -> Unit = {},
 ) {
     var open by remember { mutableStateOf(false) }
     // coming back from a release: keep the panel out until focus lands on that card again
@@ -101,10 +109,12 @@ internal fun HomePanel(
     var tab by remember { mutableStateOf(restore?.tab ?: PanelTab.Continue) }
     val firstContinue = remember { FocusRequester() }
     val firstShelfCard = remember { FocusRequester() }
+    val tabFocus = remember { PanelTab.entries.associateWith { FocusRequester() } }
     Column(
         Modifier
             .fillMaxWidth()
             .onFocusChanged {
+                if (open != it.hasFocus) onOpenChange(it.hasFocus)
                 open = it.hasFocus
                 if (it.hasFocus) restoring = false
             }
@@ -116,6 +126,7 @@ internal fun HomePanel(
         Row(verticalAlignment = Alignment.CenterVertically) {
             PanelTab.entries.forEach { t ->
                 PanelTabHandle(
+                    modifier = Modifier.focusRequester(tabFocus.getValue(t)),
                     label = stringResource(t.label),
                     selected = open && tab == t,
                     chevron = if (t == PanelTab.Continue) (if (open) Icon.ChevronDown else Icon.ChevronUp) else null,
@@ -131,7 +142,8 @@ internal fun HomePanel(
             enter = expandVertically(expandFrom = Alignment.Top) + slideInVertically { it } + fadeIn(),
             exit = shrinkVertically(shrinkTowards = Alignment.Top) + slideOutVertically { it } + fadeOut(),
         ) {
-            Column {
+            // Up from any card goes back to the open tab, not to whatever sits above it on the screen
+            Column(Modifier.focusProperties { exit = { if (it == FocusDirection.Up) tabFocus.getValue(tab) else FocusRequester.Default } }.focusGroup()) {
                 Spacer(Modifier.height(10.dp))
                 val kind = tab.kind
                 if (kind == null) {
@@ -141,7 +153,8 @@ internal fun HomePanel(
                         continueContent(firstContinue)
                     }
                 } else {
-                    ShelvesTab(kind, shelfView, restore?.takeIf { it.tab == tab }, firstShelfCard) { item, tracker -> onOpen(item, PanelReturn(tab, tracker, itemKey(item))) }
+                    // each tab keeps its own scroll positions
+                    key(kind) { ShelvesTab(kind, shelfView, restore?.takeIf { it.tab == tab }, firstShelfCard) { item, tracker -> onOpen(item, PanelReturn(tab, tracker, itemKey(item))) } }
                 }
             }
         }
@@ -149,10 +162,10 @@ internal fun HomePanel(
 }
 
 @Composable
-private fun PanelTabHandle(label: String, selected: Boolean, chevron: Icon?, onFocus: () -> Unit, onClick: () -> Unit) {
+private fun PanelTabHandle(modifier: Modifier, label: String, selected: Boolean, chevron: Icon?, onFocus: () -> Unit, onClick: () -> Unit) {
     var focused by remember { mutableStateOf(false) }
     Row(
-        Modifier
+        modifier
             .clip(RoundedCornerShape(16.dp))
             .onFocusChanged {
                 focused = it.isFocused

@@ -552,7 +552,9 @@ private fun HomeScreen(
                 RecentQueries(stringResource(R.string.recent_spoken), Icon.Mic, searches.voice) { onSearch(it, QuerySource.Voice) }
             }
         }
-        if (serverAlive == false) ServerSetup()
+        // the open panel needs the room; the setup card comes back when focus leaves it
+        var panelOpen by remember { mutableStateOf(false) }
+        if (serverAlive == false && !panelOpen) ServerSetup()
         Spacer(Modifier.weight(1f))
         HomePanel(
             shelfView = shelfView,
@@ -560,6 +562,7 @@ private fun HomeScreen(
             onOpen = onOpenShelf,
             continueEmpty = history.isEmpty(),
             onRestoreFailed = { runCatching { voiceFocus.requestFocus() } },
+            onOpenChange = { panelOpen = it },
             continueContent = { firstCard ->
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(14.dp), contentPadding = PaddingValues(vertical = 6.dp, horizontal = 4.dp)) {
                     itemsIndexed(history, key = { _, e -> "${e.item.trackerId}:${e.item.link}" }) { i, e ->
