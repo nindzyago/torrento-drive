@@ -56,6 +56,9 @@ import io.github.nindzyago.torrentodrive.lang.LanguageWords
 import io.github.nindzyago.torrentodrive.lang.Languages
 import io.github.nindzyago.torrentodrive.trackers.TrackerProvider
 import io.github.nindzyago.torrentodrive.trackers.TrackerSwitches
+import io.github.nindzyago.torrentodrive.SectionSwitches
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -67,6 +70,7 @@ private enum class Section { Connection, Trackers, TorrServer, Language, About }
 internal fun SettingsScreen(
     trackers: List<TrackerProvider>,
     switches: TrackerSwitches,
+    sectionSwitches: SectionSwitches,
     serverVersion: String?,
     onSignOut: (TrackerProvider) -> Unit,
     update: UpdateState?,
@@ -104,7 +108,10 @@ internal fun SettingsScreen(
             ) {
                 when (section) {
                     Section.Connection -> ConnectionSection(trackers)
-                    Section.Trackers -> TrackersSection(trackers, switches, onSignOut)
+                    Section.Trackers -> {
+                        TrackersSection(trackers, switches, onSignOut)
+                        ShelfSections(trackers.filter(switches::isOn), sectionSwitches)
+                    }
                     Section.TorrServer -> TorrServerSection(serverVersion)
                     Section.Language -> LanguageSection()
                     Section.About -> AboutSection(update, onUpdate, onCheckUpdates)
@@ -296,6 +303,27 @@ private fun TrackersSection(trackers: List<TrackerProvider>, switches: TrackerSw
             Text(stringResource(R.string.add_tracker), fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = Palette.Text)
             Text(stringResource(R.string.add_tracker_hint), fontSize = 11.sp, color = Palette.Muted)
         }
+    }
+}
+
+/** Which sections of each tracker fill the home screen's New and Popular shelves. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun ShelfSections(trackers: List<TrackerProvider>, switches: SectionSwitches) {
+    val withShelves = trackers.filter { it.sections.isNotEmpty() || it.requiresSignIn }
+    if (withShelves.isEmpty()) return
+    Spacer(Modifier.height(14.dp))
+    SectionHeader(stringResource(R.string.settings_sections))
+    withShelves.forEach { t ->
+        Text(stringResource(R.string.settings_sections_hint, t.name), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Palette.Muted)
+        if (t.sections.isEmpty()) {
+            Text(stringResource(R.string.settings_sections_later, t.name), fontSize = 11.sp, color = Palette.Muted)
+        } else {
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(7.dp), verticalArrangement = Arrangement.spacedBy(7.dp), modifier = Modifier.padding(2.dp)) {
+                t.sections.forEach { s -> TvButton(s.title, { switches.toggle(t, s) }, selected = switches.isOn(t, s)) }
+            }
+        }
+        Spacer(Modifier.height(6.dp))
     }
 }
 

@@ -40,6 +40,26 @@ Trackers live in `app/src/main/java/io/github/nindzyago/torrentodrive/trackers/`
    adb shell am start -n io.github.nindzyago.torrentodrive/.MainActivity --es query "some title"
    ```
 
+### New and popular shelves (optional)
+
+The home screen's bottom panel has **New** and **Popular** tabs with a shelf per tracker
+section. A tracker takes part by overriding two members of `TrackerProvider`; the app does the
+rest (ten distinct titles per shelf, a three-hour disk cache, posters, settings):
+
+- **`sections`** — the tracker's own sections in its own order, each a
+  `TrackerSection(id, title, video)`. `title` is shown as is ("Зарубежные фильмы"); `video`
+  sections are on by default, the others (games, software, books) can be switched on in
+  Settings → Trackers. Leave it empty and the tracker simply has no shelves.
+- **`browse(kind, sections)`** — for `Browse.New` the newest releases of each requested
+  section, for `Browse.Popular` the most popular ones, as `section id → items`, best first.
+  Return everything the page gives; duplicates of one title are folded by the app.
+- **`refreshSections()`** (optional) — for trackers that read their section list from the
+  site (RuTracker does, from the forum list on its search page).
+
+`RutorProvider` is the simplest example: Popular is one page (`/top`), New is one page per
+category. Keep the page parsing in a separate object so a unit test can feed it a saved page
+(see `RutorPagesTest`).
+
 ### Trackers that need an account or sit behind Cloudflare
 
 Do not send credentials from the app and do not try to get around bot checks. Instead, run
