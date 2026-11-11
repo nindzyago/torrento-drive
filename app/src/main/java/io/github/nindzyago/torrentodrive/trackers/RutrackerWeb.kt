@@ -57,9 +57,64 @@ class RutrackerWeb(context: Context) {
         addJavascriptInterface(Bridge(), "TvBridge")
     }
 
+    /** Top-level forums that can fill shelves, learned from the forum list of the site's search page. */
+    val sections = mutableStateOf<List<TrackerSection>>(emptyList())
+
+    /** Forum ids (the forum and its subforums) of each section. */
+    private var sectionForums: Map<String, List<String>> = emptyMap()
+
     init {
         CookieManager.getInstance().setAcceptCookie(true)
         user.value = prefs.getString(KEY_USER, null)
+        restoreSections(prefs.getString(KEY_SECTIONS, null))
+    }
+
+    /** Reads the forum tree from tracker.php's forum list: each top-level forum becomes a section. */
+    suspend fun refreshSections() {
+        val json = mutex.withLock {
+            load("$BASE/forum/tracker.php", interactive = false)
+            if (!isLoggedIn()) throw LoginRequired(NAME)
+            jsString(FORUMS_JS) ?: "[]"
+        }
+        if (restoreSections(json) > 0) prefs.edit().putString(KEY_SECTIONS, json).apply()
+    }
+
+    private fun restoreSections(json: String?): Int {
+        val arr = runCatching { JSONArray(json ?: return 0) }.getOrNull() ?: return 0
+        val list = (0 until arr.length()).mapNotNull { i ->
+            val o = arr.optJSONObject(i) ?: return@mapNotNull null
+            val forums = o.optJSONArray("forums") ?: return@mapNotNull null
+            val id = o.optString("id").takeIf { it.isNotEmpty() } ?: return@mapNotNull null
+            val title = o.optString("title").takeIf { it.isNotEmpty() } ?: return@mapNotNull null
+            Triple(TrackerSection(id, title, isVideo(o.optString("group"), title)), id, (0 until forums.length()).map { forums.optString(it) }.filter { it.all(Char::isDigit) && it.isNotEmpty() })
+        }
+        if (list.isEmpty()) return 0
+        sectionForums = list.associate { it.second to it.third }
+        sections.value = list.map { it.first }
+        return list.size
+    }
+
+    /**
+     * Newest or most popular releases of each section, one tracker.php page per section. The lock is taken
+     * per page, so a search started meanwhile waits for at most one page. A Cloudflare check stops the run
+     * instead of popping up the WebView: nobody asked for these pages.
+     */
+    suspend fun browse(kind: Browse, sections: List<TrackerSection>): Map<String, List<TorrentItem>> {
+        val out = linkedMapOf<String, List<TorrentItem>>()
+        for (s in sections) {
+            val forums = sectionForums[s.id]?.takeIf { it.isNotEmpty() } ?: continue
+            // o=1: by registration date, o=10: by seeders; s=2: descending; tm=7: registered in the last 7 days
+            val order = if (kind == Browse.New) "o=1&s=2" else "o=10&s=2&tm=7"
+            out[s.id] = mutex.withLock {
+                load("$BASE/forum/tracker.php?f=${forums.joinToString(",")}&$order", interactive = false)
+                if (!isLoggedIn()) {
+                    setUser(null)
+                    throw LoginRequired(NAME)
+                }
+                parseResults(jsString(SEARCH_JS) ?: "[]")
+            }
+        }
+        return out
     }
 
     suspend fun search(query: String): List<TorrentItem> = mutex.withLock {
@@ -70,8 +125,12 @@ class RutrackerWeb(context: Context) {
             setUser(null)
             throw LoginRequired(NAME)
         }
-        val arr = JSONArray(jsString(SEARCH_JS) ?: "[]")
-        (0 until arr.length()).map { i ->
+        parseResults(jsString(SEARCH_JS) ?: "[]")
+    }
+
+    private fun parseResults(json: String): List<TorrentItem> {
+        val arr = JSONArray(json)
+        return (0 until arr.length()).map { i ->
             val o = arr.getJSONObject(i)
             TorrentItem(
                 trackerId = ID,
@@ -156,13 +215,17 @@ class RutrackerWeb(context: Context) {
         prefs.edit().apply { if (name == null) remove(KEY_USER) else putString(KEY_USER, name) }.apply()
     }
 
-    private suspend fun load(url: String) {
+    private suspend fun load(url: String, interactive: Boolean = true) {
         val done = CompletableDeferred<Unit>()
         withContext(Dispatchers.Main) {
             pageLoaded = done
             webView.loadUrl(url)
         }
         withTimeout(PAGE_TIMEOUT) { done.await() }
+        if (!interactive) {
+            if (isChallenge()) error("$NAME: Cloudflare check, open a search to pass it")
+            return
+        }
         passChallenge()
     }
 
@@ -238,6 +301,38 @@ class RutrackerWeb(context: Context) {
         private const val BASE = "https://rutracker.org"
         const val SITE = "$BASE/forum/index.php"
         private const val KEY_USER = "user"
+        private const val KEY_SECTIONS = "sections"
+
+        /** Sections shown by default: films, series, cartoons, anime and documentaries, not format or 3D copies. */
+        internal fun isVideo(group: String, title: String): Boolean {
+            val t = title.lowercase()
+            val g = group.lowercase()
+            val videoGroup = Regex("кино|сериал|документал|мульт|аниме").containsMatchIn(g)
+            val videoForum = Regex("кино|фильм|сериал|мульт|аниме|документальн").containsMatchIn(t)
+            val copies = Regex("3d|стерео|dvd|hd video|театр|трейлер|обуч|видеоурок|курс").containsMatchIn(t)
+            return videoGroup && videoForum && !copies
+        }
+
+        /** The forum tree from tracker.php's forum list: top-level forums with their subforums ("|- …" options). */
+        private val FORUMS_JS = """
+            var out = [], cur = null;
+            var sel = document.querySelector('#fs-main') || document.querySelector('select[name="f[]"]');
+            if (!sel) return '[]';
+            sel.querySelectorAll('optgroup').forEach(function (g) {
+              var group = (g.getAttribute('label') || '').replace(/\u00a0/g, ' ').trim();
+              cur = null;
+              g.querySelectorAll('option').forEach(function (o) {
+                var v = o.value;
+                if (!/^\d+$/.test(v)) return;
+                var text = o.textContent.replace(/\u00a0/g, ' ');
+                var sub = /^\s*\|-/.test(text);
+                var title = text.replace(/^\s*\|-\s*/, '').trim();
+                if (!sub) { cur = {id: v, title: title, group: group, forums: [v]}; out.push(cur); }
+                else if (cur) cur.forums.push(v);
+              });
+            });
+            return JSON.stringify(out);
+        """.trimIndent()
         private const val PAGE_TIMEOUT = 60_000L
         private const val CHALLENGE_TIMEOUT = 180_000L
 
@@ -282,4 +377,10 @@ class RutrackerProvider(private val web: RutrackerWeb) : TrackerProvider {
     override val isSignedIn: Boolean get() = web.user.value != null
     override fun startSignIn() = web.startLogin()
     override suspend fun signOut() = web.logout()
+
+    override val sections: List<TrackerSection> get() = web.sections.value
+
+    override suspend fun refreshSections() = web.refreshSections()
+
+    override suspend fun browse(kind: Browse, sections: List<TrackerSection>) = web.browse(kind, sections)
 }

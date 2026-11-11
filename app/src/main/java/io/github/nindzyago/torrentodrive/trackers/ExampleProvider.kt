@@ -43,6 +43,13 @@ class ExampleProvider(private val baseUrl: String = "https://tracker.example") :
         }
     }
 
+    // Optional: sections for the home screen's New and Popular shelves (see CONTRIBUTING.md).
+    // override val sections = listOf(TrackerSection("movies", "Movies", video = true), TrackerSection("games", "Games", video = false))
+    // override suspend fun browse(kind: Browse, sections: List<TrackerSection>) = sections.associate { s ->
+    //     val sort = if (kind == Browse.New) "date" else "seeders"
+    //     s.id to parseRows(get("$baseUrl/browse/${s.id}?sort=$sort"))
+    // }
+
     // Optional: the poster is usually the first picture in the topic description.
     override suspend fun poster(item: TorrentItem): String? = withContext(Dispatchers.IO) {
         if (item.page.isEmpty()) return@withContext null

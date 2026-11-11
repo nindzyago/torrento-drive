@@ -93,6 +93,9 @@ Or download `torrento-drive.apk` from
 - **Built-in player** (Media3) with next-episode auto-play and resume where you stopped.
   Any external player can still be used.
 - **Continue watching** with posters taken from the release description.
+- **New and popular** on every tracker: pull the bottom panel up and switch to *New* or
+  *Popular* for ten releases per tracker section, under the tracker's own section names.
+  Video sections are on by default; any other section can be switched on in Settings → Trackers.
 - **Sign in on the tracker's own website.** Trackers that need an account open in a built-in
   browser with a D-pad mouse cursor; the app never sees your password, it only keeps the
   site's session cookies.

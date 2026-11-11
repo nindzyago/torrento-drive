@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.4.0
+
+- New and popular on every tracker: the home screen's bottom handle is now three tabs,
+  Continue watching · New · Popular. New and Popular show ten releases per tracker section,
+  under the tracker's own section names, with posters, quality, seeds and size; a filter picks
+  one tracker. Back from a release opened there returns to the same card.
+- Rutor: Popular is its top of the last 24 hours, New the newest releases of each category.
+- RuTracker (after sign-in): sections are the site's top-level forums; New is sorted by
+  registration date, Popular by seeders over the last week.
+- Video sections are on by default; any section of each tracker can be switched on or off in
+  Settings → Trackers. Shelves refresh on app start at most every three hours and are kept on
+  disk, nothing runs while the app is closed.
+- A new tracker can offer shelves with two optional members (see CONTRIBUTING.md).
+
 ## 0.3.1
 
 - The backdrop no longer jumps when the on-screen keyboard opens or closes for typed search.

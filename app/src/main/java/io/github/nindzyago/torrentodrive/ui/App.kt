@@ -91,6 +91,8 @@ import io.github.nindzyago.torrentodrive.trackers.Category
 import io.github.nindzyago.torrentodrive.trackers.LoginRequired
 import io.github.nindzyago.torrentodrive.trackers.RutrackerWeb
 import io.github.nindzyago.torrentodrive.trackers.TorrentItem
+import io.github.nindzyago.torrentodrive.SectionSwitches
+import io.github.nindzyago.torrentodrive.Shelves
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -147,6 +149,10 @@ fun App(
     val progress = remember { WatchProgress(context) }
     val searches = remember { SearchHistory(context) }
     val warmup = remember { VoiceWarmup() }
+    val sectionSwitches = remember { SectionSwitches(context) }
+    val shelves = remember { Shelves(context, trackers, sectionSwitches) }
+    /** Set when a release was opened from a shelf: coming back home puts focus on that card again. */
+    var panelReturn by remember { mutableStateOf<PanelReturn?>(null) }
     val scope = rememberCoroutineScope()
     var screen by remember { mutableStateOf<Screen>(Screen.Home) }
     var serverAlive by remember { mutableStateOf<Boolean?>(null) }
@@ -254,6 +260,20 @@ fun App(
     }
 
     LaunchedEffect(Unit) { updates.check()?.let { update = UpdateState(it) } }
+    // new and popular shelves: from disk at once, then refreshed if older than three hours; again after a sign-in
+    LaunchedEffect(rutracker.user.value) {
+        Connection.awaitReady()
+        shelves.refresh(switches::isOn)
+    }
+    // sections or trackers switched on in settings: fetch their shelves on the way back home
+    var settingsVisited by remember { mutableStateOf(false) }
+    LaunchedEffect(screen) {
+        if (screen == Screen.Settings) settingsVisited = true
+        else if (screen == Screen.Home && settingsVisited) {
+            settingsVisited = false
+            scope.launch { shelves.refresh(switches::isOn) }
+        }
+    }
     LaunchedEffect(Unit) {
         Connection.load(context)
         Connection.check(context, trackers)
@@ -359,11 +379,31 @@ fun App(
                         onResume = { e -> open(null, e.item, e.fileIndex) },
                         progressOf = { e -> progress.get(e.item, e.fileIndex) },
                         backEnabled = !loginOpen && !challenge,
+                        shelfView = ShelfView(
+                            shelves = { k -> shelves.shelves(k, switches::isOn) },
+                            loading = shelves.loading.value,
+                            notes = trackers.filter(switches::isOn).mapNotNull { t ->
+                                when {
+                                    t.requiresSignIn && !t.isSignedIn -> stringResource(R.string.shelves_sign_in, t.name)
+                                    shelves.errors[t.id] != null -> stringResource(R.string.shelves_error, t.name, shelves.errors[t.id]!!)
+                                    else -> null
+                                }
+                            },
+                            poster = { item -> shelves.posters[itemKey(item)] },
+                            askPoster = { item -> shelves.poster(item) },
+                        ),
+                        panelReturn = panelReturn,
+                        onPanelReturnUsed = { panelReturn = null },
+                        onOpenShelf = { item, ret ->
+                            panelReturn = ret
+                            open(null, item)
+                        },
                     )
                     Screen.Listening -> ListeningScreen(warmup, onResult = { search(it, QuerySource.Voice) }, onCancel = { screen = Screen.Home })
                     Screen.Settings -> SettingsScreen(
                         trackers = trackers,
                         switches = switches,
+                        sectionSwitches = sectionSwitches,
                         serverVersion = serverVersion,
                         onSignOut = { t -> scope.launch { t.signOut() } },
                         update = update,
@@ -438,11 +478,18 @@ private fun HomeScreen(
     onResume: (WatchEntry) -> Unit,
     progressOf: (WatchEntry) -> Progress?,
     backEnabled: Boolean,
+    shelfView: ShelfView,
+    panelReturn: PanelReturn?,
+    onPanelReturnUsed: () -> Unit,
+    onOpenShelf: (TorrentItem, PanelReturn) -> Unit,
 ) {
     val voiceFocus = remember { FocusRequester() }
     var typed by remember { mutableStateOf("") }
     var voiceFocused by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) { voiceFocus.requestFocus() }
+    val restore = remember { panelReturn }
+    LaunchedEffect(Unit) {
+        if (restore == null) voiceFocus.requestFocus() else onPanelReturnUsed()
+    }
     // Back from anywhere else on the home screen returns to the initial state; Back on the voice button exits the app
     BackHandler(enabled = backEnabled && !voiceFocused) {
         typed = ""
@@ -505,9 +552,25 @@ private fun HomeScreen(
                 RecentQueries(stringResource(R.string.recent_spoken), Icon.Mic, searches.voice) { onSearch(it, QuerySource.Voice) }
             }
         }
-        if (serverAlive == false) ServerSetup()
+        // the open panel needs the room; the setup card comes back when focus leaves it
+        var panelOpen by remember { mutableStateOf(false) }
+        if (serverAlive == false && !panelOpen) ServerSetup()
         Spacer(Modifier.weight(1f))
-        ContinueShelf(history, progressOf, onResume)
+        HomePanel(
+            shelfView = shelfView,
+            restore = restore,
+            onOpen = onOpenShelf,
+            continueEmpty = history.isEmpty(),
+            onRestoreFailed = { runCatching { voiceFocus.requestFocus() } },
+            onOpenChange = { panelOpen = it },
+            continueContent = { firstCard ->
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(14.dp), contentPadding = PaddingValues(vertical = 6.dp, horizontal = 4.dp)) {
+                    itemsIndexed(history, key = { _, e -> "${e.item.trackerId}:${e.item.link}" }) { i, e ->
+                        HistoryCard(e, progressOf(e), if (i == 0) Modifier.focusRequester(firstCard) else Modifier, onClick = { onResume(e) })
+                    }
+                }
+            },
+        )
     }
 }
 
@@ -549,58 +612,6 @@ private fun ServerSetup() {
     }
 }
 
-/**
- * "Continue watching" collapsed to a title with a chevron at the bottom of the home screen;
- * when focus comes to it, a panel with the cards slides up from below.
- */
-@Composable
-private fun ContinueShelf(history: List<WatchEntry>, progressOf: (WatchEntry) -> Progress?, onResume: (WatchEntry) -> Unit) {
-    var open by remember { mutableStateOf(false) }
-    var handleFocused by remember { mutableStateOf(false) }
-    val firstCard = remember { FocusRequester() }
-    Column(
-        Modifier
-            .fillMaxWidth()
-            .onFocusChanged { open = it.hasFocus }
-            // the panel's padding plus the handle's pill sticks out to the left so the title text lines up with the screen edge
-            .offset(x = (-24).dp)
-            .background(if (open) Palette.Bg.copy(alpha = 0.82f) else Color.Transparent, RoundedCornerShape(16.dp))
-            .padding(horizontal = 12.dp, vertical = 8.dp),
-    ) {
-        Row(
-            Modifier
-                .clip(RoundedCornerShape(16.dp))
-                .onFocusChanged { handleFocused = it.isFocused }
-                .background(if (handleFocused) Palette.Accent else Color.Transparent)
-                .clickable { if (history.isNotEmpty()) runCatching { firstCard.requestFocus() } }
-                .padding(horizontal = 12.dp, vertical = 6.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            SectionTitle(stringResource(R.string.continue_watching))
-            Spacer(Modifier.width(8.dp))
-            TvIcon(if (open) Icon.ChevronDown else Icon.ChevronUp, Palette.Text, 16.dp)
-        }
-        AnimatedVisibility(
-            visible = open,
-            enter = expandVertically(expandFrom = Alignment.Top) + slideInVertically { it } + fadeIn(),
-            exit = shrinkVertically(shrinkTowards = Alignment.Top) + slideOutVertically { it } + fadeOut(),
-        ) {
-            Column {
-                Spacer(Modifier.height(10.dp))
-                if (history.isEmpty()) {
-                    Text(stringResource(R.string.history_empty), fontSize = 12.sp, color = Palette.Muted, modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp))
-                } else {
-                    LazyRow(horizontalArrangement = Arrangement.spacedBy(14.dp), contentPadding = PaddingValues(vertical = 6.dp, horizontal = 4.dp)) {
-                        itemsIndexed(history, key = { _, e -> "${e.item.trackerId}:${e.item.link}" }) { i, e ->
-                            HistoryCard(e, progressOf(e), if (i == 0) Modifier.focusRequester(firstCard) else Modifier, onClick = { onResume(e) })
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
 /** A row of recent queries: label on the left, then suggestion buttons; pressing one searches right away. */
 @Composable
 private fun RecentQueries(label: String, icon: Icon, queries: List<String>, onPick: (String) -> Unit) {
@@ -638,11 +649,11 @@ private fun ProgressLine(progress: Progress, modifier: Modifier = Modifier) {
 }
 
 /** "Title / Original Title (Director…) [2010, …]" → "Title": cards need a short title. */
-private fun shortTitle(title: String): String =
+internal fun shortTitle(title: String): String =
     title.substringBefore(" / ").substringBefore(" (").substringBefore(" [").trim().ifEmpty { title }
 
 /** Quality parsed from the torrent title, for the colored badge. */
-private fun qualityOf(title: String): Pair<String, Color>? = when {
+internal fun qualityOf(title: String): Pair<String, Color>? = when {
     Regex("2160|\\b4k\\b|uhd", RegexOption.IGNORE_CASE).containsMatchIn(title) -> "2160p" to Palette.Warn
     title.contains("1080") -> "1080p" to Palette.Good
     title.contains("720") -> "720p" to Palette.Muted

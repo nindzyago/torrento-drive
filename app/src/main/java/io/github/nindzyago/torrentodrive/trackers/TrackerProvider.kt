@@ -24,6 +24,16 @@ sealed interface TorrentSource {
     class File(val bytes: ByteArray) : TorrentSource
 }
 
+/** What a shelf on the home screen shows: a section's newest releases or its most popular ones. */
+enum class Browse { New, Popular }
+
+/**
+ * A section of the tracker that fills shelves ("Зарубежные фильмы", "Наши сериалы"…).
+ * [title] is the tracker's own name for it; [video] sections are shown by default, the rest
+ * (games, software, books) only when switched on in settings.
+ */
+data class TrackerSection(val id: String, val title: String, val video: Boolean)
+
 /** The tracker needs a signed-in session and there is none. */
 class LoginRequired(val tracker: String) : Exception("$tracker: sign-in required")
 
@@ -53,4 +63,20 @@ interface TrackerProvider {
     fun startSignIn() {}
 
     suspend fun signOut() {}
+
+    /**
+     * Sections that can fill the home screen's "New" and "Popular" shelves, in the tracker's own order.
+     * Empty (the default) means the tracker has no shelves.
+     */
+    val sections: List<TrackerSection> get() = emptyList()
+
+    /** For trackers that learn their sections from the site: refreshes [sections]. Called before [browse]. */
+    suspend fun refreshSections() {}
+
+    /**
+     * The newest or most popular releases of each of [sections], by section id, best first.
+     * Return what the tracker gives (the app keeps the first 10 distinct titles); a section that failed
+     * or is empty may be left out.
+     */
+    suspend fun browse(kind: Browse, sections: List<TrackerSection>): Map<String, List<TorrentItem>> = emptyMap()
 }
