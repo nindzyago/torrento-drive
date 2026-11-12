@@ -114,6 +114,16 @@ class ShelvesTest {
         assertTrue(b.sections.isEmpty())
     }
 
+    @Test fun postersRoundTripAndStayBounded() {
+        val posters = linkedMapOf("rutracker:1" to "https://i.ibb.co/a.jpg", "rutor:magnet:?xt=a\tb" to "https://x/b.png")
+        assertEquals(posters, ShelfCache.decodePosters(ShelfCache.encodePosters(posters)))
+        assertTrue(ShelfCache.decodePosters("garbage\nk\tnot-a-url\n").isEmpty())
+        val many = (1..ShelfCache.MAX_POSTERS + 50).associate { "k$it" to "https://p/$it" }
+        val kept = ShelfCache.decodePosters(ShelfCache.encodePosters(many))
+        assertEquals(ShelfCache.MAX_POSTERS, kept.size)
+        assertTrue("k${ShelfCache.MAX_POSTERS + 50}" in kept && "k1" !in kept)
+    }
+
     @Test fun cacheFileIsWrittenWhole() {
         val dir = Files.createTempDirectory("shelves").toFile()
         val cache = ShelfCache(dir)

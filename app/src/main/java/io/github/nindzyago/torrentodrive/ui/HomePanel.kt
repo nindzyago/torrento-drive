@@ -74,7 +74,7 @@ internal class ShelfView(
     /** Notes under the tracker filter: sign-in needed, refresh failed. */
     val notes: List<String>,
     val poster: (TorrentItem) -> String?,
-    val askPoster: suspend (TorrentItem) -> Unit,
+    val askPoster: (TorrentItem) -> Unit,
 )
 
 /**
@@ -98,9 +98,12 @@ internal fun HomePanel(
     var open by remember { mutableStateOf(false) }
     // coming back from a release: keep the panel out until focus lands on that card again
     var restoring by remember { mutableStateOf(restore != null) }
+    // the return is used once: later visits to the tab must not pull focus down into its shelves
+    var pendingReturn by remember { mutableStateOf(restore) }
     LaunchedEffect(restore) {
         if (restore == null) return@LaunchedEffect
         kotlinx.coroutines.delay(600)
+        pendingReturn = null
         if (!open) {
             restoring = false
             onRestoreFailed()
@@ -125,8 +128,15 @@ internal fun HomePanel(
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             PanelTab.entries.forEach { t ->
+                // on the tabs Left/Right only switch tabs (never jump into the cards); Down or OK goes into the tab's content
+                val i = t.ordinal
                 PanelTabHandle(
-                    modifier = Modifier.focusRequester(tabFocus.getValue(t)),
+                    modifier = Modifier
+                        .focusRequester(tabFocus.getValue(t))
+                        .focusProperties {
+                            left = PanelTab.entries.getOrNull(i - 1)?.let { tabFocus.getValue(it) } ?: FocusRequester.Cancel
+                            right = PanelTab.entries.getOrNull(i + 1)?.let { tabFocus.getValue(it) } ?: FocusRequester.Cancel
+                        },
                     label = stringResource(t.label),
                     selected = open && tab == t,
                     chevron = if (t == PanelTab.Continue) (if (open) Icon.ChevronDown else Icon.ChevronUp) else null,
@@ -154,7 +164,7 @@ internal fun HomePanel(
                     }
                 } else {
                     // each tab keeps its own scroll positions
-                    key(kind) { ShelvesTab(kind, shelfView, restore?.takeIf { it.tab == tab }, firstShelfCard) { item, tracker -> onOpen(item, PanelReturn(tab, tracker, itemKey(item))) } }
+                    key(kind) { ShelvesTab(kind, shelfView, pendingReturn?.takeIf { it.tab == tab }, firstShelfCard) { item, tracker -> onOpen(item, PanelReturn(tab, tracker, itemKey(item))) } }
                 }
             }
         }
@@ -254,7 +264,7 @@ private fun ShelvesTab(
 }
 
 @Composable
-private fun ShelfCard(item: TorrentItem, poster: String?, modifier: Modifier, onAsk: suspend () -> Unit, onClick: () -> Unit) {
+private fun ShelfCard(item: TorrentItem, poster: String?, modifier: Modifier, onAsk: () -> Unit, onClick: () -> Unit) {
     LaunchedEffect(item.link) { onAsk() }
     TvCard(onClick, modifier.width(168.dp)) {
         val title = shortTitle(item.title)

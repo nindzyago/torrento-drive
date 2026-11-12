@@ -7,7 +7,10 @@ import io.github.nindzyago.torrentodrive.trackers.Browse
 import io.github.nindzyago.torrentodrive.trackers.TorrentItem
 import io.github.nindzyago.torrentodrive.trackers.TrackerProvider
 import io.github.nindzyago.torrentodrive.trackers.TrackerSection
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -71,6 +74,16 @@ class ShelfCache(private val dir: File) {
             }
             return ShelfBatch(at, sections)
         }
+
+        /** Posters keep at most this many entries (the newest), so the file doesn't grow forever. */
+        const val MAX_POSTERS = 600
+
+        fun encodePosters(posters: Map<String, String>): String =
+            posters.entries.toList().takeLast(MAX_POSTERS).joinToString("") { (k, v) -> esc(k) + "\t" + esc(v) + "\n" }
+
+        fun decodePosters(text: String): Map<String, String> =
+            text.lines().mapNotNull { line -> line.split("\t").takeIf { it.size == 2 }?.let { unesc(it[0]) to unesc(it[1]) } }
+                .filter { it.second.startsWith("http") }.toMap(LinkedHashMap())
 
         private fun esc(s: String) = s.replace("\\", "\\\\").replace("\t", "\\t").replace("\n", "\\n").replace("\r", "")
 
@@ -167,15 +180,47 @@ class Shelves(context: Context, private val trackers: List<TrackerProvider>, pri
     /** true while some tracker's shelves are being fetched. */
     val loading = mutableStateOf(false)
 
-    /** Poster URLs found so far, by "<tracker>:<link>"; only cards that were on screen ask for one. */
+    /** Poster URLs found so far, by "<tracker>:<link>"; only cards that were on screen ask for one. Kept on disk. */
     val posters = mutableStateMapOf<String, String>()
+    private val posterFile = File(context.filesDir, "shelves/posters.txt")
     private val askedPosters = mutableSetOf<String>()
 
-    suspend fun poster(item: TorrentItem) {
+    /**
+     * Ask the tracker for a card's poster. The lookup runs in the app's scope, not the card's: on RuTracker it waits
+     * behind the shelf pages, and a card that scrolled away or a tab switch must not cancel it (and mark it as asked).
+     * A failed lookup may be asked again; "no poster" is remembered.
+     */
+    fun poster(item: TorrentItem) {
         val key = "${item.trackerId}:${item.link}"
-        if (!askedPosters.add(key)) return
+        if (key in posters || !askedPosters.add(key)) return
         val tracker = trackers.firstOrNull { it.id == item.trackerId } ?: return
-        runCatching { tracker.poster(item) }.getOrNull()?.let { posters[key] = it }
+        scope.launch {
+            try {
+                tracker.poster(item)?.let {
+                    posters[key] = it
+                    savePosters()
+                }
+            } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                askedPosters.remove(key)
+            }
+        }
+    }
+
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+
+    init {
+        runCatching { posters.putAll(ShelfCache.decodePosters(posterFile.readText())) }
+    }
+
+    private suspend fun savePosters() {
+        val text = ShelfCache.encodePosters(posters.toMap())
+        withContext(Dispatchers.IO) {
+            posterFile.parentFile?.mkdirs()
+            val tmp = File(posterFile.path + ".tmp")
+            tmp.writeText(text)
+            if (!tmp.renameTo(posterFile)) { posterFile.delete(); tmp.renameTo(posterFile) }
+        }
     }
 
     fun shelves(kind: Browse, isOn: (TrackerProvider) -> Boolean): List<Shelf> = trackers.filter(isOn).flatMap { t ->
