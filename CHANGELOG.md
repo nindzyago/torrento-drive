@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.1
+
+- RuTracker posters on the New and Popular shelves: a poster lookup is no longer cancelled
+  when its card scrolls away or the tab changes, and posters found are kept on disk, so they
+  are not fetched again on every start.
+- Bottom panel: Left/Right on the tabs only switch tabs; Down or OK goes into the cards. After
+  coming back from a release, returning to its tab no longer pulls focus down into the shelf.
+
 ## 0.4.0
 
 - New and popular on every tracker: the home screen's bottom handle is now three tabs,
