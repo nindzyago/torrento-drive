@@ -90,6 +90,7 @@ import io.github.nindzyago.torrentodrive.torrserver.TorrentStats
 import io.github.nindzyago.torrentodrive.trackers.Category
 import io.github.nindzyago.torrentodrive.trackers.LoginRequired
 import io.github.nindzyago.torrentodrive.trackers.RutrackerWeb
+import io.github.nindzyago.torrentodrive.trackers.TorrentDetails
 import io.github.nindzyago.torrentodrive.trackers.TorrentItem
 import io.github.nindzyago.torrentodrive.SectionSwitches
 import io.github.nindzyago.torrentodrive.Shelves
@@ -119,6 +120,8 @@ private sealed interface Screen {
         val stats: TorrentStats? = null,
         /** Poster from the torrent description. */
         val poster: String? = null,
+        /** The torrent page's description and facts, once the tracker answered. */
+        val details: TorrentDetails? = null,
     ) : Screen
     /** Buffering the selected file before launching the player. */
     data class Loading(val from: Files, val file: TorrentFile, val stats: TorrentStats? = null) : Screen
@@ -238,7 +241,10 @@ fun App(
         // look up the poster while the torrent opens; from history, reuse the known one
         val known = history.entries.firstOrNull { it.item.trackerId == item.trackerId && it.item.link == item.link }?.poster
         if (known != null) update(files.copy(poster = known))
-        else scope.launch { runCatching { provider.poster(item) }.getOrNull()?.let { update(files.copy(poster = it)) } }
+        // description, facts and (if not known yet) the poster, from the torrent's page
+        scope.launch {
+            runCatching { provider.details(item) }.getOrNull()?.let { d -> update(files.copy(details = d, poster = files.poster ?: d.poster)) }
+        }
         scope.launch {
             try {
                 val source = provider.source(item)
@@ -251,8 +257,8 @@ fun App(
                 val resumed = resumeIndex?.let { i -> videos.indexOfFirst { it.index == i } }?.takeIf { it >= 0 }?.let { i ->
                     if (progress.get(item, videos[i].index)?.finished == true) videos.getOrNull(i + 1) ?: videos[i] else videos[i]
                 }
-                val auto = resumed ?: videos.singleOrNull()
-                if (auto != null && (screen as? Screen.Files)?.item == item) load(files, auto)
+                // only "Continue watching" starts by itself; anything else waits on the Watch button
+                if (resumed != null && (screen as? Screen.Files)?.item == item) load(files, resumed)
             } catch (e: Exception) {
                 update(files.copy(error = e.message ?: e.toString()))
             }
@@ -357,6 +363,11 @@ fun App(
                   )
               } else {
               Backdrop(dense = screen != Screen.Home && screen != Screen.Listening)
+              when (val s = screen) {
+                  is Screen.Files -> PosterBackdrop(s.poster)
+                  is Screen.Loading -> PosterBackdrop(s.from.poster)
+                  else -> Unit
+              }
               Box(Modifier.fillMaxSize().padding(horizontal = 42.dp, vertical = 27.dp)) {
                 when (val s = screen) {
                     Screen.Home -> HomeScreen(
@@ -411,8 +422,8 @@ fun App(
                         onCheckUpdates = { updates.check()?.also { update = UpdateState(it) } != null },
                     )
                     is Screen.Results -> ResultsScreen(s, onOpen = { open(s, it) })
-                    is Screen.Files -> FilesScreen(
-                        s,
+                    is Screen.Files -> ReleaseScreen(
+                        Release(s.item, s.poster, s.details, s.files, s.error, s.stats),
                         watched = history.entries.firstOrNull { it.item.trackerId == s.item.trackerId && it.item.link == s.item.link },
                         progressOf = { progress.get(s.item, it.index) },
                         onPlay = { file -> load(s, file) },
@@ -642,7 +653,7 @@ private fun HistoryCard(e: WatchEntry, progress: Progress?, modifier: Modifier =
 
 /** Thin bar showing how much of an episode was watched. */
 @Composable
-private fun ProgressLine(progress: Progress, modifier: Modifier = Modifier) {
+internal fun ProgressLine(progress: Progress, modifier: Modifier = Modifier) {
     Box(modifier.fillMaxWidth().height(3.dp).background(Palette.Glass)) {
         Box(Modifier.fillMaxWidth(if (progress.finished) 1f else progress.fraction).height(3.dp).background(Palette.Accent))
     }
@@ -727,93 +738,6 @@ private fun ResultCard(item: TorrentItem, onClick: () -> Unit, modifier: Modifie
 }
 
 @Composable
-private fun FilesScreen(s: Screen.Files, watched: WatchEntry?, progressOf: (TorrentFile) -> Progress?, onPlay: (TorrentFile) -> Unit) {
-    Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(33.dp)) {
-        Column(Modifier.width(225.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            PosterImage(
-                s.poster,
-                shortTitle(s.item.title),
-                90.sp,
-                Modifier.fillMaxWidth().height(250.dp).clip(RoundedCornerShape(12.dp)),
-            )
-            Text(shortTitle(s.item.title), fontSize = 19.sp, fontWeight = FontWeight.Bold, color = Palette.Text, maxLines = 2, overflow = TextOverflow.Ellipsis)
-            val files = s.files
-            val total = files?.sumOf { it.length } ?: 0L
-            Text(
-                listOfNotNull(
-                    files?.let { pluralStringResource(R.plurals.files_count, it.size, it.size) },
-                    qualityOf(s.item.title)?.first,
-                    if (total > 0) formatSize(total) else s.item.size,
-                ).joinToString(" · "),
-                fontSize = 11.sp,
-                color = Palette.Muted,
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                val seeds = s.stats?.seeders ?: s.item.seeds
-                Text(stringResource(R.string.seeds_dot, seeds), fontSize = 11.sp, color = seedColor(seeds))
-                Text(s.item.tracker, fontSize = 11.sp, color = Palette.Muted)
-            }
-        }
-        Column(Modifier.weight(1f)) {
-            val files = s.files
-            when {
-                s.error != null -> Text(stringResource(R.string.open_failed, s.error), color = Palette.Accent, fontSize = 15.sp)
-                files == null -> {
-                    Text(stringResource(R.string.waiting_files), color = Palette.Muted, fontSize = 15.sp)
-                    Spacer(Modifier.height(14.dp))
-                    s.stats?.let { StatsBlock(it) }
-                }
-                files.isEmpty() -> Text(stringResource(R.string.no_video), color = Palette.Accent, fontSize = 15.sp)
-                else -> {
-                    val lastIdx = files.indexOfFirst { it.index == watched?.fileIndex }
-                    // continue the last episode if it was left midway, otherwise offer the one after it
-                    val lastUnfinished = files.getOrNull(lastIdx)?.takeIf { progressOf(it)?.resumable == true }
-                    val next = lastUnfinished ?: files.getOrNull(lastIdx + 1)?.takeIf { lastIdx >= 0 }
-                    val focus = remember { FocusRequester() }
-                    LaunchedEffect(files) { runCatching { focus.requestFocus() } }
-                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        Text(stringResource(if (files.size > 1) R.string.episodes else R.string.file), fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = Palette.Text)
-                        Spacer(Modifier.weight(1f))
-                        if (next != null) TvButton(stringResource(R.string.continue_n, files.indexOf(next) + 1), { onPlay(next) }, primary = true, icon = Icon.Play)
-                    }
-                    Spacer(Modifier.height(8.dp))
-                    val focusFile = next ?: files.getOrNull(lastIdx) ?: files.first()
-                    LazyColumn(verticalArrangement = Arrangement.spacedBy(6.dp), contentPadding = PaddingValues(vertical = 4.dp, horizontal = 4.dp)) {
-                        items(files, key = { it.index }) { file ->
-                            val i = files.indexOf(file)
-                            val p = progressOf(file)
-                            val seen = p?.finished == true || (lastIdx >= 0 && i < lastIdx)
-                            val isLast = i == lastIdx
-                            TvCard(
-                                onClick = { onPlay(file) },
-                                modifier = Modifier.fillMaxWidth().then(if (file === focusFile) Modifier.focusRequester(focus) else Modifier),
-                            ) {
-                                if (p != null && p.resumable) ProgressLine(p)
-                                Row(Modifier.padding(horizontal = 13.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-                                    Text("%02d".format(i + 1), fontSize = 12.sp, color = if (isLast) Palette.Accent else Palette.Muted, modifier = Modifier.width(24.dp))
-                                    Text(
-                                        file.name,
-                                        fontSize = 13.sp,
-                                        color = if (seen) Palette.Muted else Palette.Text,
-                                        modifier = Modifier.weight(1f),
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                    )
-                                    if (isLast) { Tag(stringResource(R.string.watched_last), Palette.AccentSoft); Spacer(Modifier.width(9.dp)) }
-                                    if (p != null && p.resumable) { Text(formatTime(p.positionMs), fontSize = 10.sp, color = Palette.AccentSoft); Spacer(Modifier.width(9.dp)) }
-                                    else if (seen) { Text(stringResource(R.string.watched), fontSize = 10.sp, color = Palette.Muted); Spacer(Modifier.width(9.dp)) }
-                                    Text(formatSize(file.length), fontSize = 10.sp, color = Palette.Muted)
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
 private fun LoadingScreen(s: Screen.Loading, onPlayNow: () -> Unit) {
     val focus = remember { FocusRequester() }
     LaunchedEffect(Unit) { focus.requestFocus() }
@@ -887,6 +811,6 @@ internal fun formatSpeed(bytesPerSec: Long): String =
     else stringResource(R.string.speed_kb, (bytesPerSec / 1024).toInt())
 
 @Composable
-private fun formatSize(bytes: Long): String =
+internal fun formatSize(bytes: Long): String =
     if (bytes >= 1L shl 30) stringResource(R.string.size_gb, bytes / (1L shl 30).toDouble())
     else stringResource(R.string.size_mb, (bytes / (1L shl 20)).toInt())
