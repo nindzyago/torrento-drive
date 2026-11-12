@@ -92,6 +92,9 @@ Or download `torrento-drive.apk` from
   shows seeds, peers and speed and the video starts once the buffer is ready.
 - **Built-in player** (Media3) with next-episode auto-play and resume where you stopped.
   Any external player can still be used.
+- **Release screen**: poster, plot, year, country, genre, director, cast, translation and quality
+  from the release's own page, the torrent's seeds, size and speed, then the episodes. Nothing
+  starts by itself: press **Watch** (or **Continue · episode N**).
 - **Continue watching** with posters taken from the release description.
 - **New and popular** on every tracker: pull the bottom panel up and switch to *New* or
   *Popular* for ten releases per tracker section, under the tracker's own section names.

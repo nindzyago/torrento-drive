@@ -50,6 +50,15 @@ class ExampleProvider(private val baseUrl: String = "https://tracker.example") :
     //     s.id to parseRows(get("$baseUrl/browse/${s.id}?sort=$sort"))
     // }
 
+    // Optional: the release screen's description. Most trackers write "Label: value" lines that
+    // DescriptionText reads; fetch the page once for both the poster and the text.
+    // override suspend fun details(item: TorrentItem): TorrentDetails? = withContext(Dispatchers.IO) {
+    //     val doc = Jsoup.parse(get(item.page), item.page)
+    //     val body = doc.selectFirst(".description") ?: return@withContext null
+    //     val p = DescriptionText.parse(DescriptionText.of(body))
+    //     TorrentDetails(body.selectFirst("img[src]")?.absUrl("src"), p.description, p.facts, p.ratings)
+    // }
+
     // Optional: the poster is usually the first picture in the topic description.
     override suspend fun poster(item: TorrentItem): String? = withContext(Dispatchers.IO) {
         if (item.page.isEmpty()) return@withContext null
