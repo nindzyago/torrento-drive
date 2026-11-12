@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.5.1
+
+- RuTracker no longer signs you out on its own. Before, any page that came back without your
+  username (an error page, a page still loading, a redirect) dropped the sign-in, and the New and
+  Popular shelves load many pages at every start. Now the app signs out only when RuTracker itself
+  shows its sign-in form, twice, the second time on its home page; anything else is an error to
+  retry.
+- The RuTracker session is kept: the cookies are written to disk after every page and a copy is
+  kept in the app's settings. If the built-in browser loses them (an app or WebView update), the
+  copy is put back at start.
+
 ## 0.5.0
 
 - Release screen: what used to be a list of files is now the release's page. Poster, title and

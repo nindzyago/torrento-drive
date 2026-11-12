@@ -66,6 +66,7 @@ class RutrackerWeb(context: Context) {
     init {
         CookieManager.getInstance().setAcceptCookie(true)
         user.value = prefs.getString(KEY_USER, null)
+        if (user.value != null) restoreCookies()
         restoreSections(prefs.getString(KEY_SECTIONS, null))
     }
 
@@ -73,7 +74,7 @@ class RutrackerWeb(context: Context) {
     suspend fun refreshSections() {
         val json = mutex.withLock {
             load("$BASE/forum/tracker.php", interactive = false)
-            if (!isLoggedIn()) throw LoginRequired(NAME)
+            requireSession(interactive = false)
             jsString(FORUMS_JS) ?: "[]"
         }
         if (restoreSections(json) > 0) prefs.edit().putString(KEY_SECTIONS, json).apply()
@@ -107,10 +108,7 @@ class RutrackerWeb(context: Context) {
             val order = if (kind == Browse.New) "o=1&s=2" else "o=10&s=2&tm=7"
             out[s.id] = mutex.withLock {
                 load("$BASE/forum/tracker.php?f=${forums.joinToString(",")}&$order", interactive = false)
-                if (!isLoggedIn()) {
-                    setUser(null)
-                    throw LoginRequired(NAME)
-                }
+                requireSession(interactive = false)
                 parseResults(jsString(SEARCH_JS) ?: "[]")
             }
         }
@@ -121,10 +119,7 @@ class RutrackerWeb(context: Context) {
         val q = URLEncoder.encode(query, "windows-1251")
         // o=10: sort by seeders, s=2: descending
         load("$BASE/forum/tracker.php?nm=$q&o=10&s=2")
-        if (!isLoggedIn()) {
-            setUser(null)
-            throw LoginRequired(NAME)
-        }
+        requireSession(interactive = true)
         parseResults(jsString(SEARCH_JS) ?: "[]")
     }
 
@@ -204,6 +199,7 @@ class RutrackerWeb(context: Context) {
     suspend fun logout() = withContext(Dispatchers.Main) {
         CookieManager.getInstance().removeAllCookies(null)
         CookieManager.getInstance().flush()
+        prefs.edit().remove(KEY_COOKIES).apply()
         webView.loadUrl("about:blank")
         setUser(null)
     }
@@ -212,7 +208,7 @@ class RutrackerWeb(context: Context) {
     private fun checkManualLogin(view: WebView) {
         view.evaluateJavascript("(function(){var a=document.querySelector('#logged-in-username');return a?a.textContent.trim():null;})()") { raw ->
             val name = JSONTokener(raw ?: "null").nextValue() as? String ?: return@evaluateJavascript
-            CookieManager.getInstance().flush()
+            backupCookies()
             setUser(name)
             manualLogin.value = false
             view.loadUrl("about:blank")
@@ -263,8 +259,57 @@ class RutrackerWeb(context: Context) {
         "return document.title.indexOf('Just a moment')>=0 || !!document.querySelector('#challenge-form,.cf-turnstile,#cf-challenge-running,[id^=\"cf-chl\"],script[src*=\"challenges.cloudflare.com\"]');"
     ) == "true"
 
-    private suspend fun isLoggedIn(): Boolean =
-        js("return !!document.querySelector('#logged-in-username, a[href*=\"logout\"]');") == "true"
+    /**
+     * What the page says about the session: signed in (our name in the header), signed out (the site shows
+     * its sign-in form) or neither (an error page, a page that hasn't finished, a redirect).
+     */
+    private suspend fun session(): Session = when (js(SESSION_JS).trim('"')) {
+        "in" -> Session.In
+        "out" -> Session.Out
+        else -> Session.Unknown
+    }
+
+    /**
+     * After a page load: carries on when signed in (and keeps a copy of the session); signs out only when the
+     * site itself shows the sign-in form, twice, the second time on the home page. Anything else is an error
+     * that leaves the sign-in alone: the next page will most likely be fine.
+     */
+    private suspend fun requireSession(interactive: Boolean) {
+        when (session()) {
+            Session.In -> { backupCookies(); return }
+            Session.Unknown -> error("$NAME: the page did not load, try again")
+            Session.Out -> {
+                load("$BASE/forum/index.php", interactive)
+                when (session()) {
+                    Session.In -> { backupCookies(); error("$NAME: the page did not load, try again") }
+                    Session.Out -> { setUser(null); throw LoginRequired(NAME) }
+                    Session.Unknown -> error("$NAME: the page did not load, try again")
+                }
+            }
+        }
+    }
+
+    private enum class Session { In, Out, Unknown }
+
+    /**
+     * Keeps a copy of the RuTracker cookies in the app's settings and writes the cookie store to disk at once,
+     * so an update (the process is killed right away) or a WebView reset doesn't lose the session.
+     */
+    private fun backupCookies() {
+        val cm = CookieManager.getInstance()
+        cm.flush()
+        val cookies = cm.getCookie(BASE) ?: return
+        if (hasSession(cookies) && cookies != prefs.getString(KEY_COOKIES, null)) prefs.edit().putString(KEY_COOKIES, cookies).apply()
+    }
+
+    /** At start: if the WebView has lost the session cookie but we kept a copy, put the copy back. */
+    private fun restoreCookies() {
+        val cm = CookieManager.getInstance()
+        val restore = cookiesToRestore(cm.getCookie(BASE), prefs.getString(KEY_COOKIES, null))
+        if (restore.isEmpty()) return
+        restore.forEach { pair -> cm.setCookie(BASE, "$pair; Domain=.rutracker.org; Path=/; Max-Age=31536000; Secure") }
+        cm.flush()
+    }
 
     private suspend fun onRutracker(): Boolean = withContext(Dispatchers.Main) {
         webView.url?.startsWith(BASE) == true
@@ -328,11 +373,28 @@ class RutrackerWeb(context: Context) {
             return "%02d.%02d.20%s".format(m.groupValues[1].toInt(), month, m.groupValues[3])
         }
 
+        /** Our username in the header: signed in. The sign-in form (password field) or the sign-in page: signed out. */
+        private const val SESSION_JS =
+            "if(document.querySelector('#logged-in-username, a[href*=\"logout\"]'))return 'in';" +
+                "if(location.pathname.indexOf('login.php')>=0||document.querySelector('input[name=\"login_password\"]'))return 'out';" +
+                "return 'unknown';"
+
+        /** The session cookie RuTracker sets on sign-in. */
+        private fun hasSession(cookies: String?) = cookies?.split(';')?.any { it.trim().startsWith("bb_session=") } == true
+
+        /** "a=1; b=2" pairs of [backup] to put back when [current] has no session cookie; none otherwise. */
+        internal fun cookiesToRestore(current: String?, backup: String?): List<String> {
+            if (hasSession(current) || !hasSession(backup)) return emptyList()
+            val have = current.orEmpty().split(';').map { it.trim().substringBefore('=') }.toSet()
+            return backup!!.split(';').map { it.trim() }.filter { it.contains('=') && it.substringBefore('=') !in have }
+        }
+
         const val ID = "rutracker"
         const val NAME = "RuTracker"
         private const val BASE = "https://rutracker.org"
         const val SITE = "$BASE/forum/index.php"
         private const val KEY_USER = "user"
+        private const val KEY_COOKIES = "cookies"
         private const val KEY_SECTIONS = "sections"
 
         /** Sections shown by default: films, series, cartoons, anime and documentaries, not format or 3D copies. */
