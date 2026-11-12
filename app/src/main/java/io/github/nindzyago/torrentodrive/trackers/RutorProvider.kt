@@ -23,14 +23,20 @@ class RutorProvider(private val baseUrl: String = "https://rutor.info") : Tracke
         RutorPages.rows(Jsoup.parse(get("$baseUrl/search/0/0/100/2/$q"), baseUrl).body(), id, name)
     }
 
-    // the poster is the first image in the torrent description (#details)
-    override suspend fun poster(item: TorrentItem): String? = withContext(Dispatchers.IO) {
-        if (item.page.isEmpty()) return@withContext null
-        val html = Http.trackers.newCall(Request.Builder().url(item.page).build()).execute().use { resp ->
-            if (!resp.isSuccessful) return@withContext null
-            resp.body.string()
+    // poster and description come from the same page: fetch it once for the shelf card and the release screen
+    private val pages = DetailsCache()
+
+    override suspend fun poster(item: TorrentItem): String? = details(item)?.poster
+
+    override suspend fun details(item: TorrentItem): TorrentDetails? = pages.get(item.link) {
+        if (item.page.isEmpty()) return@get null
+        withContext(Dispatchers.IO) {
+            val html = Http.trackers.newCall(Request.Builder().url(item.page).build()).execute().use { resp ->
+                if (!resp.isSuccessful) return@withContext null
+                resp.body.string()
+            }
+            RutorPages.details(html, item.page)
         }
-        Jsoup.parse(html, item.page).selectFirst("#details img[src]")?.absUrl("src")?.takeIf { it.isNotEmpty() }
     }
 
     override val sections = RutorPages.sections
@@ -96,6 +102,19 @@ internal object RutorPages {
             val peers = row.selectFirst("span.red")?.text()?.filter(Char::isDigit)?.toIntOrNull() ?: 0
             TorrentItem(trackerId, tracker, title, size, seeds, peers, magnet, page = topic.absUrl("href"))
         }
+
+    /** The torrent page: the poster is the description's first image, the text is "Label: value" lines. */
+    fun details(html: String, pageUrl: String): TorrentDetails? {
+        val doc = Jsoup.parse(html, pageUrl)
+        val details = doc.getElementById("details") ?: return null
+        // the first row holds the description; the rows after it are the tracker's own (seeds, added, size)
+        val body = details.selectFirst("tr > td:eq(1)") ?: return null
+        val poster = body.selectFirst("img[src]")?.absUrl("src")?.takeIf { it.startsWith("http") }
+        val parsed = DescriptionText.parse(DescriptionText.of(body))
+        val added = details.select("td.header").firstOrNull { it.text().trim() == "Добавлен" }?.nextElementSibling()?.text()
+            ?.let { Regex("(\\d{2})-(\\d{2})-(\\d{4})").find(it) }?.let { m -> "${m.groupValues[1]}.${m.groupValues[2]}.${m.groupValues[3]}" }.orEmpty()
+        return TorrentDetails(poster, parsed.description, parsed.facts, parsed.ratings, added)
+    }
 
     /** /top: "most popular in category <a href=/kino>…</a>" headings, each followed by its table. */
     fun top(html: String, baseUrl: String, trackerId: String, tracker: String): Map<String, List<TorrentItem>> {
