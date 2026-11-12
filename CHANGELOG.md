@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.5.0
+
+- Release screen: what used to be a list of files is now the release's page. Poster, title and
+  original title, year, country, genre, length, director, cast, translation, quality and the plot,
+  read from the release's page on the tracker (Rutor and RuTracker); seeds, peers, size, when it
+  was added and the live speed on the left; episodes below. The background is the blurred poster.
+- Nothing starts by itself any more, even a single file: focus waits on **Watch**, or
+  **Continue · episode N** / **Continue from 12:40** for something already started. A card in
+  Continue watching on the home screen still resumes right away.
+- The plot shows five lines; OK on it shows all of it.
+- Trackers: a new optional `details(item)` and a shared description reader (see CONTRIBUTING.md).
+
 ## 0.4.1
 
 - RuTracker posters on the New and Popular shelves: a poster lookup is no longer cancelled

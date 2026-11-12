@@ -34,6 +34,23 @@ enum class Browse { New, Popular }
  */
 data class TrackerSection(val id: String, val title: String, val video: Boolean)
 
+/**
+ * What the torrent's page on the tracker says about the release: poster, the "about the film" text and
+ * the "Label: value" lines the uploader wrote (year, genre, director, cast, translation…), read by [DescriptionText].
+ */
+data class TorrentDetails(
+    val poster: String? = null,
+    val description: String = "",
+    val facts: Map<Fact, String> = emptyMap(),
+    /** Ratings the uploader quoted ("IMDb" to "7.1"), in the page's order. */
+    val ratings: List<Pair<String, String>> = emptyList(),
+    /** When the torrent was added or registered, as the tracker shows it ("11.11.2026"). */
+    val added: String = "",
+)
+
+/** A release fact from the description, in the order the release screen shows them. */
+enum class Fact { Title, Original, Year, Country, Genre, Duration, Director, Cast, Translation, Subtitles, Quality, Video, Audio }
+
 /** The tracker needs a signed-in session and there is none. */
 class LoginRequired(val tracker: String) : Exception("$tracker: sign-in required")
 
@@ -52,6 +69,13 @@ interface TrackerProvider {
 
     /** URL of the poster image from the torrent description (the post's first image), or null. */
     suspend fun poster(item: TorrentItem): String? = null
+
+    /**
+     * The release screen's description: poster, text and facts from the torrent's page, or null if the tracker
+     * can't tell. Most trackers turn the description into text and hand it to [DescriptionText.parse].
+     * By default only the poster.
+     */
+    suspend fun details(item: TorrentItem): TorrentDetails? = poster(item)?.let { TorrentDetails(poster = it) }
 
     /** true if the tracker only searches after sign-in (then implement [isSignedIn], [startSignIn], [signOut]). */
     val requiresSignIn: Boolean get() = false

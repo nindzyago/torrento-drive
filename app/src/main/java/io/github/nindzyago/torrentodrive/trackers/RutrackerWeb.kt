@@ -146,20 +146,29 @@ class RutrackerWeb(context: Context) {
     }
 
     /**
-     * Torrent poster: the first image of the first post. The page is fetched from the RuTracker context
-     * and parsed with DOMParser, so the page's images aren't loaded and the WebView doesn't waste memory.
+     * Torrent page details: the first post's first image, its text with line breaks (spoilers, quotes and
+     * MediaInfo left out, at most 20 KB) and the registration date. The page is fetched from the RuTracker
+     * context and parsed with DOMParser, so its images aren't loaded and the WebView doesn't waste memory.
      */
-    suspend fun poster(topicId: String): String? = mutex.withLock {
+    suspend fun details(topicId: String): TorrentDetails? = mutex.withLock {
         if (!onRutracker()) load("$BASE/forum/index.php")
-        val url = jsAsync(
+        val json = jsAsync(
             "fetch('/forum/viewtopic.php?t=$topicId',{credentials:'include'})" +
                 ".then(function(r){return r.arrayBuffer();})" +
                 ".then(function(b){var html=new TextDecoder('windows-1251').decode(b);" +
                 "var d=new DOMParser().parseFromString(html,'text/html');" +
-                "var e=d.querySelector('.post_body var.postImg, .post_body img.postImg, .post_body img');" +
-                "return e?(e.getAttribute('title')||e.getAttribute('src')||''):'';})"
+                "var post=d.querySelector('.post_body');if(!post)return '';" +
+                "var e=post.querySelector('var.postImg, img.postImg, img');" +
+                "var img=e?(e.getAttribute('title')||e.getAttribute('src')||''):'';" +
+                "function tx(n){var o='';n.childNodes.forEach(function(c){" +
+                "if(c.nodeType==3){o+=c.nodeValue.replace(/\\n/g,' ');return;}if(c.nodeType!=1)return;" +
+                "var t=c.tagName,cl=(c.className||'')+'';if(t=='BR'){o+='\\n';return;}" +
+                "if(t=='SCRIPT'||t=='STYLE'||/sp-wrap|sp-body|sp-head|q-wrap|c-wrap/.test(cl))return;" +
+                "var b=/^(DIV|P|LI|UL|OL|HR|H[1-6]|TABLE|TR|PRE|BLOCKQUOTE)$/.test(t);if(b)o+='\\n';o+=tx(c);if(b)o+='\\n';});return o;}" +
+                "var m=/Зарегистрирован[^\\[]*\\[\\s*([^\\]]+?)\\s*\\]/.exec(d.body?d.body.textContent:'');" +
+                "return img+'\\u0001'+(m?m[1]:'')+'\\u0001'+tx(post).slice(0,20000);})"
         )
-        url.takeIf { it.startsWith("http") }
+        detailsOf(json)
     }
 
     /** Downloads the .torrent from the RuTracker page context, with cookies, like an ordinary browser. */
@@ -296,6 +305,29 @@ class RutrackerWeb(context: Context) {
     }
 
     companion object {
+        private val MONTHS = listOf("янв", "фев", "мар", "апр", "май", "июн", "июл", "авг", "сен", "окт", "ноя", "дек")
+
+        /** Separates the page script's answer: image, registration date, post text. */
+        internal const val SEP = '\u0001'
+
+        /** The page script's answer "img␁added␁text"; null when the page had no post (signed out, check, error). */
+        internal fun detailsOf(answer: String): TorrentDetails? {
+            val parts = answer.split(SEP, limit = 3)
+            if (parts.size != 3) return null
+            val parsed = DescriptionText.parse(parts[2])
+            val poster = parts[0].takeIf { it.startsWith("http") }
+            if (poster == null && parsed.description.isEmpty() && parsed.facts.isEmpty()) return null
+            return TorrentDetails(poster, parsed.description, parsed.facts, parsed.ratings, addedOf(parts[1]))
+        }
+
+        /** "11-Ноя-24 15:30" → "11.11.2024". */
+        internal fun addedOf(s: String): String {
+            val m = Regex("(\\d{1,2})-(\\p{L}{3})-(\\d{2})").find(s) ?: return ""
+            val month = MONTHS.indexOf(m.groupValues[2].lowercase()) + 1
+            if (month == 0) return ""
+            return "%02d.%02d.20%s".format(m.groupValues[1].toInt(), month, m.groupValues[3])
+        }
+
         const val ID = "rutracker"
         const val NAME = "RuTracker"
         private const val BASE = "https://rutracker.org"
@@ -371,7 +403,11 @@ class RutrackerProvider(private val web: RutrackerWeb) : TrackerProvider {
 
     override suspend fun source(item: TorrentItem) = TorrentSource.File(web.torrentFile(item.link))
 
-    override suspend fun poster(item: TorrentItem) = web.poster(item.link)
+    private val pages = DetailsCache()
+
+    override suspend fun poster(item: TorrentItem) = details(item)?.poster
+
+    override suspend fun details(item: TorrentItem) = pages.get(item.link) { web.details(item.link) }
 
     override val requiresSignIn = true
     override val isSignedIn: Boolean get() = web.user.value != null

@@ -30,8 +30,13 @@ Trackers live in `app/src/main/java/io/github/nindzyago/torrentodrive/trackers/`
    HTML.
 4. **`source(item)` (optional).** The default hands `item.link` to TorrServer as a magnet/URL.
    Override it if the tracker gives `.torrent` files only — return `TorrentSource.File(bytes)`.
-5. **`poster(item)` (optional).** Return the URL of the first picture in the release
-   description; it is cached and shown in "Continue watching".
+5. **`details(item)` (optional).** What the release page says: poster, plot, year, genre,
+   director, cast, translation… shown on the release screen. Turn the description into text
+   with line breaks (`DescriptionText.of(element)` for Jsoup) and hand it to
+   `DescriptionText.parse(text)`: it reads the "Label: value" lines Russian trackers use and
+   cuts off MediaInfo. Return `TorrentDetails(poster, parsed.description, parsed.facts,
+   parsed.ratings, added)`. Fetch the page once for both poster and text (`DetailsCache`).
+   A tracker that only knows the poster can override `poster(item)` instead.
 6. **Register it.** Add one line to `Trackers.all()` in `Trackers.kt`.
 7. **Try it on a device:**
 

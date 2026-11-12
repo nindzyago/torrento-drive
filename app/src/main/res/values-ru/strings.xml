@@ -167,4 +167,19 @@
     <string name="settings_sections">Подборки на главном экране</string>
     <string name="settings_sections_hint">Разделы %s в «Новинках» и «Популярном»</string>
     <string name="settings_sections_later">Разделы появятся, когда %s откроется после входа</string>
+    <string name="watch">Смотреть</string>
+    <string name="watch_first">Смотреть с 1 серии</string>
+    <string name="continue_episode">Продолжить · серия %d</string>
+    <string name="continue_at">Продолжить с %s</string>
+    <string name="opening_torrent">Открываю раздачу…</string>
+    <string name="fact_director">Режиссёр</string>
+    <string name="fact_cast">В ролях</string>
+    <string name="fact_translation">Перевод</string>
+    <string name="fact_video">Видео</string>
+    <string name="fact_audio">Аудио</string>
+    <string name="fact_subtitles">Субтитры</string>
+    <string name="seeds_peers">%1$d сидов · %2$d пиров</string>
+    <string name="added_on">добавлена %s</string>
+    <string name="live_peers">%1$d подключений · %2$s</string>
+    <string name="more">ещё</string>
 </resources>

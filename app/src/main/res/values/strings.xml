@@ -164,4 +164,19 @@
     <string name="settings_sections">Shelves on the home screen</string>
     <string name="settings_sections_hint">Sections of %s shown under New and Popular</string>
     <string name="settings_sections_later">The sections show up once %s has been opened with a sign-in</string>
+    <string name="watch">Watch</string>
+    <string name="watch_first">Watch from episode 1</string>
+    <string name="continue_episode">Continue · episode %d</string>
+    <string name="continue_at">Continue from %s</string>
+    <string name="opening_torrent">Opening the torrent…</string>
+    <string name="fact_director">Director</string>
+    <string name="fact_cast">Cast</string>
+    <string name="fact_translation">Translation</string>
+    <string name="fact_video">Video</string>
+    <string name="fact_audio">Audio</string>
+    <string name="fact_subtitles">Subtitles</string>
+    <string name="seeds_peers">%1$d seeds · %2$d peers</string>
+    <string name="added_on">added %s</string>
+    <string name="live_peers">%1$d connected · %2$s</string>
+    <string name="more">more</string>
 </resources>
