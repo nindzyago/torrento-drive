@@ -62,6 +62,9 @@ internal object Radius {
     val L = RoundedCornerShape(16.dp)
 }
 
+/** Left and right inset of the screens' content from the screen edge (rows that scroll sideways bleed past it on the right). */
+internal val ScreenGutter = 44.dp
+
 internal val Accent = Palette.Accent
 internal val Muted = Palette.Muted
 

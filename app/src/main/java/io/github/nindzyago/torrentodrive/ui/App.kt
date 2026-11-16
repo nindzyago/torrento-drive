@@ -50,7 +50,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.focusProperties
@@ -385,7 +387,7 @@ fun App(
                   is Screen.Loading -> PosterBackdrop(s.from.poster)
                   else -> Unit
               }
-              Box(Modifier.fillMaxSize().padding(horizontal = 44.dp, vertical = 28.dp)) {
+              Box(Modifier.fillMaxSize().padding(horizontal = ScreenGutter, vertical = 28.dp)) {
                 when (val s = screen) {
                     Screen.Home -> HomeScreen(
                         serverAlive = serverAlive,
@@ -514,16 +516,53 @@ private fun HomeScreen(
     onOpenShelf: (TorrentItem, PanelReturn) -> Unit,
 ) {
     val voiceFocus = remember { FocusRequester() }
+    val setupFocus = remember { FocusRequester() }
+    val updateFocus = remember { FocusRequester() }
+    val settingsFocus = remember { FocusRequester() }
     var typed by remember { mutableStateOf("") }
     var voiceFocused by remember { mutableStateOf(false) }
+    var setupFocused by remember { mutableStateOf(false) }
+    // the open panel needs the room; the setup card comes back when focus leaves it
+    var panelOpen by remember { mutableStateOf(false) }
+    val setupShown = serverAlive == false && !panelOpen
+    // focus goes to the setup card's button as soon as the card is on screen
+    var wantSetupFocus by remember { mutableStateOf(false) }
     val restore = remember { panelReturn }
-    LaunchedEffect(Unit) {
-        if (restore == null) voiceFocus.requestFocus() else onPanelReturnUsed()
+    val serverAtStart = remember { serverAlive }
+
+    /** The home screen's initial focus: the setup card's button while TorrServer is missing, otherwise Speak. */
+    fun focusHome() {
+        if (serverAlive == false) {
+            wantSetupFocus = true
+            // the card is hidden while the panel is open: leaving the panel brings it back
+            if (panelOpen) runCatching { voiceFocus.requestFocus() }
+        } else {
+            runCatching { voiceFocus.requestFocus() }
+        }
     }
-    // Back from anywhere else on the home screen returns to the initial state; Back on the voice button exits the app
-    BackHandler(enabled = backEnabled && !voiceFocused) {
+
+    LaunchedEffect(Unit) {
+        if (restore == null) focusHome() else onPanelReturnUsed()
+    }
+    LaunchedEffect(setupShown, wantSetupFocus) {
+        if (setupShown && wantSetupFocus) {
+            runCatching { setupFocus.requestFocus() }
+            wantSetupFocus = false
+        }
+    }
+    LaunchedEffect(serverAlive) {
+        when {
+            // the first check found no TorrServer while focus still sits where the screen put it
+            serverAlive == false && serverAtStart == null && restore == null && voiceFocused -> focusHome()
+            // TorrServer came up: the card and its focused button are gone
+            serverAlive == true && setupFocused -> runCatching { voiceFocus.requestFocus() }
+        }
+    }
+    val homeFocused = if (serverAlive == false) setupFocused else voiceFocused
+    // Back from anywhere else on the home screen returns to the initial state; Back on the initial element exits the app
+    BackHandler(enabled = backEnabled && !homeFocused) {
         typed = ""
-        voiceFocus.requestFocus()
+        focusHome()
     }
 
     Column(Modifier.fillMaxSize()) {
@@ -551,10 +590,10 @@ private fun HomeScreen(
                     update.failed -> stringResource(R.string.update_failed)
                     else -> stringResource(R.string.update_available, update.update.version)
                 }
-                TvButton(label, onUpdate, icon = Icon.Download)
+                TvButton(label, onUpdate, Modifier.focusRequester(updateFocus), icon = Icon.Download)
                 Spacer(Modifier.width(12.dp))
             }
-            TvIconButton(Icon.Gear, stringResource(R.string.settings), onSettings)
+            TvIconButton(Icon.Gear, stringResource(R.string.settings), onSettings, Modifier.focusRequester(settingsFocus))
         }
         Spacer(Modifier.height(48.dp))
         Text(stringResource(R.string.home_title), fontSize = Type.Hero, fontWeight = FontWeight.Bold, color = Palette.Text, letterSpacing = (-0.5).sp)
@@ -571,7 +610,11 @@ private fun HomeScreen(
             Spacer(Modifier.width(12.dp))
             TvTextField(
                 typed, { typed = it }, stringResource(R.string.search_hint),
-                Modifier.width(345.dp).onFocusChanged { fieldFocused = it.isFocused },
+                Modifier
+                    .width(345.dp)
+                    .onFocusChanged { fieldFocused = it.hasFocus }
+                    // Right goes up to the header buttons, not to a search suggestion that happens to stick out below
+                    .focusProperties { right = if (update != null) updateFocus else settingsFocus },
                 imeAction = ImeAction.Search,
                 onImeAction = { onSearch(typed, QuerySource.Typed) },
             )
@@ -582,19 +625,19 @@ private fun HomeScreen(
                 RecentQueries(stringResource(R.string.recent_spoken), Icon.Mic, searches.voice) { onSearch(it, QuerySource.Voice) }
             }
         }
-        // the open panel needs the room; the setup card comes back when focus leaves it
-        var panelOpen by remember { mutableStateOf(false) }
-        if (serverAlive == false && !panelOpen) ServerSetup()
+        if (setupShown) {
+            ServerSetup(Modifier.focusRequester(setupFocus).onFocusChanged { setupFocused = it.isFocused })
+        }
         Spacer(Modifier.weight(1f))
         HomePanel(
             shelfView = shelfView,
             restore = restore,
             onOpen = onOpenShelf,
             continueEmpty = history.isEmpty(),
-            onRestoreFailed = { runCatching { voiceFocus.requestFocus() } },
+            onRestoreFailed = { focusHome() },
             onOpenChange = { panelOpen = it },
             continueContent = { firstCard ->
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(16.dp), contentPadding = PaddingValues(vertical = 6.dp, horizontal = 4.dp)) {
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(16.dp), contentPadding = PaddingValues(top = 6.dp, bottom = 6.dp, start = 4.dp, end = ScreenGutter)) {
                     itemsIndexed(history, key = { _, e -> "${e.item.trackerId}:${e.item.link}" }) { i, e ->
                         HistoryCard(e, progressOf(e), if (i == 0) Modifier.focusRequester(firstCard) else Modifier, onClick = { onResume(e) })
                     }
@@ -607,18 +650,31 @@ private fun HomeScreen(
 /** A newer release found on GitHub and where its installation stands. */
 internal data class UpdateState(val update: Update, val busy: Boolean = false, val failed: Boolean = false)
 
-/** Shown while TorrServer doesn't answer: how to install or start TorrServe. */
+/**
+ * Shown while TorrServer doesn't answer: how to install or start TorrServe.
+ * [buttonModifier] goes on the card's button (the home screen's initial focus while the card is shown).
+ */
 @Composable
-private fun ServerSetup() {
+private fun ServerSetup(buttonModifier: Modifier) {
     val context = LocalContext.current
     var launch by remember { mutableStateOf(torrServeLaunch(context)) }
+    var buttonFocused by remember { mutableStateOf(false) }
+    val buttonFocus = remember { FocusRequester() }
     // notice TorrServe being installed while the card is on screen
     LaunchedEffect(Unit) {
         while (launch == null) {
             delay(2000)
-            launch = torrServeLaunch(context)
+            val found = torrServeLaunch(context) ?: continue
+            // Install turns into Open: keep focus on the button if it was there
+            val hadFocus = buttonFocused
+            launch = found
+            if (hadFocus) {
+                withFrameNanos { }
+                runCatching { buttonFocus.requestFocus() }
+            }
         }
     }
+    val button = buttonModifier.focusRequester(buttonFocus).onFocusChanged { buttonFocused = it.isFocused }
     Column(
         Modifier
             .padding(top = 24.dp)
@@ -635,9 +691,9 @@ private fun ServerSetup() {
         Spacer(Modifier.height(16.dp))
         val open = launch
         if (open != null) {
-            TvButton(stringResource(R.string.open_torrserve), { context.startActivity(open) }, primary = true)
+            TvButton(stringResource(R.string.open_torrserve), { context.startActivity(open) }, button, primary = true, large = true)
         } else {
-            InstallTorrServeButton(reinstall = false)
+            InstallTorrServeButton(reinstall = false, modifier = button, large = true)
         }
     }
 }
