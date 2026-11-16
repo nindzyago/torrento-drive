@@ -47,6 +47,8 @@
     <string name="open_failed">Could not open: %s</string>
     <string name="waiting_files">Opening the torrent, waiting for the file list…</string>
     <string name="no_video">No video files in this torrent</string>
+    <string name="release_server_start">Open TorrServe and press Try again.</string>
+    <string name="release_server_install">TorrServe isn\'t installed. Install it, start its server and press Try again.</string>
     <string name="episodes">Episodes</string>
     <string name="file">File</string>
     <string name="continue_n">Continue: %d</string>
