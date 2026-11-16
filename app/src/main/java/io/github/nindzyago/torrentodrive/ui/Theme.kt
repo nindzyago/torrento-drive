@@ -148,7 +148,7 @@ internal fun SectionTitle(text: String) {
 }
 
 /**
- * Chrome "t" with the TORRENTO DRIVE wordmark, rendered from art/logo-lockup.svg; [height] is the whole lockup.
+ * Torrento Drive lockup (ring mark + wordmark), rendered from art/brand/torrento-drive-lockup.svg; [height] is the whole lockup.
  * Shifted left so the letter itself (not its speed trails) lines up with the content below.
  */
 @Composable
@@ -156,6 +156,6 @@ internal fun Logo(height: androidx.compose.ui.unit.Dp = 36.dp) {
     androidx.compose.foundation.Image(
         androidx.compose.ui.res.painterResource(io.github.nindzyago.torrentodrive.R.drawable.logo_lockup),
         contentDescription = androidx.compose.ui.res.stringResource(io.github.nindzyago.torrentodrive.R.string.app_name),
-        modifier = Modifier.height(height).offset(x = -height * 0.52f),
+        modifier = Modifier.height(height),
     )
 }
