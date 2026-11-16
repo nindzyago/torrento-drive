@@ -33,7 +33,7 @@ internal object Palette {
     val Bg = Color(0xFF0B0C10)
     val Surface = Color(0xE6181A20)
     val SurfaceHi = Color(0xFF20232C)
-    val Line = Color(0x4DFFFFFF) // 30 % white: 3:1 against Bg for resting borders (design review R16)
+    val Line = Color(0x56FFFFFF) // 34 % white: 3.02:1 against Bg for resting borders (design review R16)
     val Glass = Color(0x12FFFFFF)
     val Text = Color(0xFFF2F3F5)
     val Muted = Color(0xFFA3A8B2)

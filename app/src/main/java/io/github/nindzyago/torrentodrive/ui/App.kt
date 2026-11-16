@@ -824,7 +824,7 @@ private fun SearchingPlaceholders() {
     val first = remember { FocusRequester() }
     LaunchedEffect(Unit) { runCatching { first.requestFocus() } }
     val description = stringResource(R.string.searching)
-    Column(Modifier.padding(vertical = 6.dp, horizontal = 4.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(Modifier.padding(vertical = 8.dp, horizontal = 4.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         listOf(0.72f, 0.56f, 0.64f, 0.48f, 0.6f).forEachIndexed { i, width ->
             TvCard(
                 onClick = {},
