@@ -28,13 +28,8 @@ Java_io_github_nindzyago_torrentodrive_connection_ByeDpi_run(JNIEnv *env, jclass
         have_defaults = 1;
     }
     params = defaults;
-    // start reading the arguments from the beginning again: Android's libc is BSD-like here, glibc only matters to tests
-    #ifdef __GLIBC__
+    // start reading the arguments from the beginning again (0 makes getopt reset itself, in bionic and glibc alike)
     optind = 0;
-    #else
-    optind = 1;
-    optreset = 1;
-    #endif
 
     int argc = (*env)->GetArrayLength(env, args);
     char **argv = calloc(argc + 1, sizeof(char *));
