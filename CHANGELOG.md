@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.6.0
+
+- New look for the name: Torrento is becoming a family of apps (Drive, then Play, Music…), and
+  Drive gets the family's mark, a ring of twelve pieces with a play sign in the middle. New app
+  icon, TV banner and logo on the home screen and on webOS. Sources and the generator are in
+  `art/brand/`.
+- Easier to read from the couch: six text sizes instead of twenty-two, nothing smaller than 14sp,
+  spacing on a 4dp grid, and the outlines of the search field and buttons are visible at rest.
+- Home: the keyboard opens only when you press OK on the search field, so moving through it with
+  the remote no longer traps you in the keyboard. Without TorrServer the focus starts on
+  **Install TorrServe**. The RuTracker sign-in note scrolls with the shelves instead of covering
+  them, rows run to the edge of the screen, and shelf cards say how many seeds there are.
+- Search: Up from the results goes to the selected category, not the nearest one. Without a
+  RuTracker sign-in the search no longer opens RuTracker's robot check. While searching, the
+  screen shows placeholder rows and which trackers it is asking.
+- Release screen: when TorrServer is not running it says so and offers **Open TorrServe** (or
+  **Install TorrServe**) and **Try again**, instead of an error with nothing to press.
+- Player: **Other player** shows only when another video player is installed; otherwise the first
+  button after an error is **Try again**.
+- Russian: seeds, peers and connections agree with their number, sizes read «14,29 ГБ», and the
+  texts no longer assume the viewer is a man.
+
 ## 0.5.1
 
 - RuTracker no longer signs you out on its own. Before, any page that came back without your
