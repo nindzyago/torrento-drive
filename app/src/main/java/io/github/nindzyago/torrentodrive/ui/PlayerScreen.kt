@@ -44,6 +44,7 @@ import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -514,7 +515,7 @@ private fun BufferingBadge(stats: TorrentStats?, modifier: Modifier = Modifier) 
         stats?.let {
             Spacer(Modifier.height(4.dp))
             Text(
-                "${stringResource(R.string.seeds_dot, it.seeders)} · ${formatSpeed(it.speedBytes)}",
+                "${pluralStringResource(R.plurals.seeds_dot, it.seeders, it.seeders)} · ${formatSpeed(it.speedBytes)}",
                 fontSize = Type.Caption,
                 color = seedColor(it.seeders),
             )

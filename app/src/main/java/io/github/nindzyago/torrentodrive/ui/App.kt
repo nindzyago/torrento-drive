@@ -865,13 +865,13 @@ private fun ResultCard(item: TorrentItem, onClick: () -> Unit, modifier: Modifie
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     qualityOf(item.title)?.let { (q, c) -> Tag(q, c) }
                     Tag(stringResource(item.category.label))
-                    Text("${item.size} · ${item.tracker}", fontSize = Type.Caption, color = Palette.Muted)
+                    Text("${trackerSize(item.size)} · ${item.tracker}", fontSize = Type.Caption, color = Palette.Muted)
                 }
             }
             Spacer(Modifier.width(20.dp))
             Column(horizontalAlignment = Alignment.End) {
                 Text("${item.seeds}", fontSize = Type.Title, fontWeight = FontWeight.ExtraBold, color = seedColor(item.seeds))
-                Text(stringResource(R.string.seeds_label), fontSize = Type.Caption, color = Palette.Muted)
+                Text(pluralStringResource(R.plurals.seeds_label, item.seeds), fontSize = Type.Caption, color = Palette.Muted)
             }
         }
     }
@@ -915,7 +915,7 @@ private fun LoadingScreen(s: Screen.Loading, onPlayNow: () -> Unit) {
 @Composable
 private fun StatsBlock(st: TorrentStats) {
     Row(horizontalArrangement = Arrangement.spacedBy(44.dp)) {
-        Stat("${st.seeders}", stringResource(R.string.seeds_label), seedColor(st.seeders))
+        Stat("${st.seeders}", pluralStringResource(R.plurals.seeds_label, st.seeders), seedColor(st.seeders))
         Stat("${st.activePeers} / ${st.totalPeers}", stringResource(R.string.peers_label))
         Stat(formatSpeed(st.speedBytes), stringResource(R.string.speed_label))
     }

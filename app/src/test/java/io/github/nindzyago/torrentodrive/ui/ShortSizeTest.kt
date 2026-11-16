@@ -31,4 +31,17 @@ class ShortSizeTest {
         assertEquals("", shortSize(""))
         assertEquals("big", shortSize("big"))
     }
+
+    @Test
+    fun russianUnitsAndComma() {
+        assertEquals("14,29 ГБ", localSize("14.29 GB", "ru"))
+        assertEquals("746 МБ", localSize("746 MB", "ru"))
+        assertEquals("1,2 ТБ", localSize("1.2 TB", "ru"))
+    }
+
+    @Test
+    fun otherLanguagesAndUnknownFormatsUnchanged() {
+        assertEquals("14.29 GB", localSize("14.29 GB", "en"))
+        assertEquals("about 3 GB", localSize("about 3 GB", "ru"))
+    }
 }

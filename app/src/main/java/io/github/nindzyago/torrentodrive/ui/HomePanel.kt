@@ -307,6 +307,19 @@ private val SizePattern = Regex("""^(\d+)(?:([.,])(\d+))?\s*(\S.*)$""")
  * A tracker's size made short enough for a shelf card: whole units from 10 up ("19.98 GB" → "20 GB"),
  * one decimal below ("8.73 GB" → "8.7 GB"). Anything it doesn't recognise comes back as it was.
  */
+/** A tracker's size string in the UI language: "14.29 GB" → "14,29 ГБ" in Russian (design review R19). */
+internal fun localSize(size: String, language: String): String {
+    if (language != "ru") return size
+    val m = Regex("""^(\d+)(?:[.,](\d+))?\s*(TB|GB|MB|KB|B)$""", RegexOption.IGNORE_CASE).matchEntire(size.trim()) ?: return size
+    val (whole, fraction, unit) = m.destructured
+    val ru = mapOf("TB" to "ТБ", "GB" to "ГБ", "MB" to "МБ", "KB" to "КБ", "B" to "Б")[unit.uppercase()] ?: unit
+    return if (fraction.isEmpty()) "$whole $ru" else "$whole,$fraction $ru"
+}
+
+@Composable
+internal fun trackerSize(size: String): String =
+    localSize(size, androidx.compose.ui.platform.LocalConfiguration.current.locales[0].language)
+
 internal fun shortSize(size: String): String {
     val m = SizePattern.matchEntire(size.trim()) ?: return size
     val (whole, separator, fraction, unit) = m.destructured
@@ -330,7 +343,7 @@ private fun ShelfCard(item: TorrentItem, poster: String?, modifier: Modifier, on
             Spacer(Modifier.height(4.dp))
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 qualityOf(item.title)?.let { (q, c) -> Tag(q, c) }
-                Text(shortSize(item.size), fontSize = Type.Caption, color = Palette.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(trackerSize(shortSize(item.size)), fontSize = Type.Caption, color = Palette.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             Spacer(Modifier.height(4.dp))
             // seeds labelled like on the search results, in the torrent's health colour

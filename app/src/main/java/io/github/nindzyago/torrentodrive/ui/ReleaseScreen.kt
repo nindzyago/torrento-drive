@@ -119,11 +119,11 @@ internal fun ReleaseScreen(
             PosterImage(r.poster, title, 90.sp, Modifier.fillMaxWidth().height(290.dp).clip(Radius.M))
             Spacer(Modifier.height(4.dp))
             val seeds = maxOf(r.item.seeds, r.stats?.seeders ?: 0)
-            Text(stringResource(R.string.seeds_peers, seeds, r.item.peers), fontSize = Type.Caption, fontWeight = FontWeight.SemiBold, color = seedColor(seeds))
+            Text(stringResource(R.string.seeds_peers, pluralStringResource(R.plurals.seeds_count, seeds, seeds), pluralStringResource(R.plurals.peers_count, r.item.peers, r.item.peers)), fontSize = Type.Caption, fontWeight = FontWeight.SemiBold, color = seedColor(seeds))
             val total = files?.sumOf { it.length } ?: 0L
             Text(
                 listOfNotNull(
-                    if (total > 0) formatSize(total) else r.item.size,
+                    if (total > 0) formatSize(total) else trackerSize(r.item.size),
                     files?.takeIf { it.size > 1 }?.let { pluralStringResource(R.plurals.files_count, it.size, it.size) },
                 ).joinToString(" · "),
                 fontSize = Type.Caption, color = Palette.Muted,
@@ -133,7 +133,7 @@ internal fun ReleaseScreen(
                 fontSize = Type.Caption, color = Palette.Muted,
             )
             r.stats?.takeIf { it.totalPeers > 0 || it.speedBytes > 0 }?.let { st ->
-                Text(stringResource(R.string.live_peers, st.activePeers, formatSpeed(st.speedBytes)), fontSize = Type.Caption, color = Palette.Muted)
+                Text(stringResource(R.string.live_peers, pluralStringResource(R.plurals.connections_count, st.activePeers, st.activePeers), formatSpeed(st.speedBytes)), fontSize = Type.Caption, color = Palette.Muted)
             }
             d?.facts?.get(Fact.Video)?.let { SmallFact(stringResource(R.string.fact_video), it) }
             d?.facts?.get(Fact.Audio)?.let { SmallFact(stringResource(R.string.fact_audio), it) }
@@ -250,7 +250,7 @@ private fun WatchRow(
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         // one button for every state, so focus stays on it when the file list arrives
         TvButton(label, { file?.let(onPlay) }, Modifier.focusRequester(focus), primary = true, large = true, icon = if (file != null) Icon.Play else null)
-        if (files == null) r.stats?.let { Text(stringResource(R.string.live_peers, it.activePeers, formatSpeed(it.speedBytes)), fontSize = Type.Caption, color = Palette.Muted) }
+        if (files == null) r.stats?.let { Text(stringResource(R.string.live_peers, pluralStringResource(R.plurals.connections_count, it.activePeers, it.activePeers), formatSpeed(it.speedBytes)), fontSize = Type.Caption, color = Palette.Muted) }
     }
 }
 

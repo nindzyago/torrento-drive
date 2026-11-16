@@ -40,10 +40,16 @@
     <string name="searching_trackers">Searching %s…</string>
     <string name="nothing_found">nothing found</string>
     <string name="all_count">All · %d</string>
-    <string name="seeds_label">seeds</string>
+    <plurals name="seeds_label">
+        <item quantity="one">seed</item>
+        <item quantity="other">seeds</item>
+    </plurals>
     <string name="peers_label">peers</string>
     <string name="speed_label">speed</string>
-    <string name="seeds_dot">● %d seeds</string>
+    <plurals name="seeds_dot">
+        <item quantity="one">● %d seed</item>
+        <item quantity="other">● %d seeds</item>
+    </plurals>
     <string name="open_failed">Could not open: %s</string>
     <string name="waiting_files">Opening the torrent, waiting for the file list…</string>
     <string name="no_video">No video files in this torrent</string>
@@ -115,7 +121,7 @@
     <string name="track_n">Track %d</string>
     <string name="next_in">Next episode in %d s</string>
     <string name="next_label">Episode %1$d · %2$s</string>
-    <string name="next_play">Play now</string>
+    <string name="next_play">Watch now</string>
     <string name="next_cancel">Cancel</string>
     <string name="settings">Settings</string>
     <string name="settings_connection">Connection</string>
@@ -182,8 +188,16 @@
     <string name="fact_video">Video</string>
     <string name="fact_audio">Audio</string>
     <string name="fact_subtitles">Subtitles</string>
-    <string name="seeds_peers">%1$d seeds · %2$d peers</string>
+    <string name="seeds_peers">%1$s · %2$s</string>
+    <plurals name="peers_count">
+        <item quantity="one">%d peer</item>
+        <item quantity="other">%d peers</item>
+    </plurals>
     <string name="added_on">added %s</string>
-    <string name="live_peers">%1$d connected · %2$s</string>
+    <string name="live_peers">%1$s · %2$s</string>
+    <plurals name="connections_count">
+        <item quantity="one">%d connected</item>
+        <item quantity="other">%d connected</item>
+    </plurals>
     <string name="more">more</string>
 </resources>
