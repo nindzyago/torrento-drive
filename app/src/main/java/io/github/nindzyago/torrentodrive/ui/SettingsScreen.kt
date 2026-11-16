@@ -386,7 +386,12 @@ private fun TorrServerSection(version: String?) {
 
 /** Downloads the latest TorrServe from GitHub and installs it (over the installed one if [reinstall]). */
 @Composable
-internal fun InstallTorrServeButton(reinstall: Boolean, primary: Boolean = !reinstall) {
+internal fun InstallTorrServeButton(
+    reinstall: Boolean,
+    primary: Boolean = !reinstall,
+    modifier: Modifier = Modifier,
+    large: Boolean = false,
+) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var installing by remember { mutableStateOf(false) }
@@ -405,7 +410,7 @@ internal fun InstallTorrServeButton(reinstall: Boolean, primary: Boolean = !rein
             failed = runCatching { ApkInstaller.install(context, apk) }.isFailure
             installing = false
         }
-    }, primary = primary, icon = Icon.Download)
+    }, modifier, primary = primary, large = large, icon = Icon.Download)
 }
 
 @Composable

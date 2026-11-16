@@ -151,6 +151,12 @@
         <item quantity="many">%d раздач</item>
         <item quantity="other">%d раздачи</item>
     </plurals>
+    <plurals name="seeds_count">
+        <item quantity="one">%d сид</item>
+        <item quantity="few">%d сида</item>
+        <item quantity="many">%d сидов</item>
+        <item quantity="other">%d сида</item>
+    </plurals>
     <plurals name="files_count">
         <item quantity="one">%d файл</item>
         <item quantity="few">%d файла</item>

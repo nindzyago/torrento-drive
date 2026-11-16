@@ -150,6 +150,10 @@
         <item quantity="one">%d torrent</item>
         <item quantity="other">%d torrents</item>
     </plurals>
+    <plurals name="seeds_count">
+        <item quantity="one">%d seed</item>
+        <item quantity="other">%d seeds</item>
+    </plurals>
     <plurals name="files_count">
         <item quantity="one">%d file</item>
         <item quantity="other">%d files</item>
