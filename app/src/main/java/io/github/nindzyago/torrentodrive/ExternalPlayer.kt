@@ -9,6 +9,9 @@ import android.net.Uri
 internal object ExternalPlayer {
     const val NOVA_PACKAGE = "org.courville.nova"
 
+    /** Android TV's placeholder handlers: they "resolve" a video intent only to say no app can open it. */
+    private val STUBS = setOf("com.android.tv.frameworkpackagestubs", "com.google.android.tv.frameworkpackagestubs")
+
     /** The intent handed to another player; also what [available] asks the system about. */
     fun intent(url: Uri, title: String): Intent = Intent(Intent.ACTION_VIEW)
         .setDataAndType(url, "video/*")
@@ -21,6 +24,6 @@ internal object ExternalPlayer {
     fun available(context: Context): Boolean {
         val probe = intent(Uri.parse("http://127.0.0.1:8090/stream/probe.mkv"), "")
         return context.packageManager.queryIntentActivities(probe, PackageManager.MATCH_DEFAULT_ONLY)
-            .any { it.activityInfo?.packageName != context.packageName }
+            .any { it.activityInfo?.packageName.let { pkg -> pkg != context.packageName && pkg !in STUBS } }
     }
 }
