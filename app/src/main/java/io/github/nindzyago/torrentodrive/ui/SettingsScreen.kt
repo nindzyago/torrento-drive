@@ -84,13 +84,13 @@ internal fun SettingsScreen(
     val language = remember { AppLanguage.current(context) }
 
     Column(Modifier.fillMaxSize()) {
-        Text(stringResource(R.string.settings), fontSize = 27.sp, fontWeight = FontWeight.Bold, color = Palette.Text)
+        Text(stringResource(R.string.settings), fontSize = Type.Headline, fontWeight = FontWeight.Bold, color = Palette.Text)
         Spacer(Modifier.height(24.dp))
         Row(Modifier.fillMaxSize()) {
             // coming back from the right side lands on the open section, not on whichever item is nearest
             Column(
                 Modifier.width(210.dp).focusProperties { enter = { focus.getValue(section) } }.focusGroup(),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 @Composable
                 fun item(s: Section, icon: Icon?, emoji: String?, title: String, dot: Color? = null) =
@@ -104,7 +104,7 @@ internal fun SettingsScreen(
             Spacer(Modifier.width(36.dp))
             Column(
                 Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(bottom = 24.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 when (section) {
                     Section.Connection -> ConnectionSection(trackers)
@@ -132,7 +132,7 @@ private fun NavItem(
     dot: Color? = null,
     onFocus: () -> Unit,
 ) {
-    val shape = RoundedCornerShape(11.dp)
+    val shape = Radius.M
     Surface(
         onClick = onFocus,
         modifier = modifier.fillMaxWidth().onFocusChanged { if (it.isFocused) onFocus() },
@@ -149,13 +149,13 @@ private fun NavItem(
         ),
         scale = ClickableSurfaceDefaults.scale(focusedScale = 1.02f),
     ) {
-        Row(Modifier.padding(horizontal = 14.dp, vertical = 11.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.width(20.dp), contentAlignment = Alignment.Center) {
                 if (icon != null) TvIcon(icon, if (selected) Palette.Text else Palette.Muted, 18.dp)
-                else Text(emoji.orEmpty(), fontSize = 15.sp)
+                else Text(emoji.orEmpty(), fontSize = Type.Body)
             }
-            Spacer(Modifier.width(14.dp))
-            Text(title, fontSize = 15.sp, fontWeight = FontWeight.Medium, color = if (selected) Palette.Text else Palette.Muted)
+            Spacer(Modifier.width(16.dp))
+            Text(title, fontSize = Type.Body, fontWeight = FontWeight.Medium, color = if (selected) Palette.Text else Palette.Muted)
             if (dot != null) {
                 Spacer(Modifier.weight(1f))
                 Box(Modifier.size(7.dp).background(dot, CircleShape))
@@ -166,8 +166,8 @@ private fun NavItem(
 
 @Composable
 private fun SectionHeader(title: String, subtitle: String? = null) {
-    Text(title, fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Palette.Text)
-    if (subtitle != null) Text(subtitle, fontSize = 13.sp, color = Palette.Muted, lineHeight = 19.sp, modifier = Modifier.width(560.dp))
+    Text(title, fontSize = Type.Title, fontWeight = FontWeight.Bold, color = Palette.Text)
+    if (subtitle != null) Text(subtitle, fontSize = Type.Caption, color = Palette.Muted, lineHeight = Type.CaptionLine, modifier = Modifier.width(560.dp))
     Spacer(Modifier.height(4.dp))
 }
 
@@ -182,16 +182,16 @@ private fun RadioCard(title: String, description: String?, selected: Boolean, ba
             ) {
                 if (selected) Box(Modifier.size(8.dp).background(Palette.Accent, CircleShape))
             }
-            Spacer(Modifier.width(14.dp))
+            Spacer(Modifier.width(16.dp))
             Column {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(title, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = Palette.Text)
+                    Text(title, fontSize = Type.Body, fontWeight = FontWeight.SemiBold, color = Palette.Text)
                     if (badge != null) {
                         Spacer(Modifier.width(8.dp))
                         Tag(badge, if (selected) Palette.AccentSoft else Palette.Muted)
                     }
                 }
-                if (description != null) Text(description, fontSize = 12.sp, color = Palette.Muted, lineHeight = 17.sp)
+                if (description != null) Text(description, fontSize = Type.Caption, color = Palette.Muted, lineHeight = Type.CaptionLine)
             }
         }
     }
@@ -223,7 +223,7 @@ private fun ConnectionSection(trackers: List<TrackerProvider>) {
                     stringResource(R.string.connection_in_use, stringResource(active!!.title))
                 else -> stringResource(R.string.connection_check)
             }
-            Text(caption.uppercase(), fontSize = 11.sp, fontWeight = FontWeight.Medium, color = Palette.Muted, letterSpacing = 1.sp)
+            Text(caption.uppercase(), fontSize = Type.Caption, fontWeight = FontWeight.Medium, color = Palette.Muted, letterSpacing = 1.sp)
             Spacer(Modifier.weight(1f))
             TvButton(stringResource(R.string.connection_check_again), { if (!checking) scope.launch { Connection.check(context, trackers) } })
         }
@@ -242,9 +242,9 @@ private fun ReachLine(tracker: TrackerProvider) {
     }
     Row(verticalAlignment = Alignment.CenterVertically) {
         Box(Modifier.size(7.dp).background(color, CircleShape))
-        Spacer(Modifier.width(10.dp))
-        Text(tracker.name, fontSize = 13.sp, fontWeight = FontWeight.Medium, color = Palette.Text, modifier = Modifier.width(96.dp))
-        Text(text, fontSize = 13.sp, color = Palette.Muted)
+        Spacer(Modifier.width(12.dp))
+        Text(tracker.name, fontSize = Type.Caption, fontWeight = FontWeight.Medium, color = Palette.Text, modifier = Modifier.width(96.dp))
+        Text(text, fontSize = Type.Caption, color = Palette.Muted)
     }
 }
 
@@ -253,8 +253,8 @@ private fun Panel(content: @Composable ColumnScope.() -> Unit) {
     Column(
         Modifier
             .fillMaxWidth()
-            .background(Palette.Glass, RoundedCornerShape(11.dp))
-            .border(1.dp, Palette.Line, RoundedCornerShape(11.dp))
+            .background(Palette.Glass, Radius.M)
+            .border(1.dp, Palette.Line, Radius.M)
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
         content = content,
@@ -269,20 +269,20 @@ private fun TrackersSection(trackers: List<TrackerProvider>, switches: TrackerSw
         Row(
             Modifier
                 .fillMaxWidth()
-                .background(Palette.Surface, RoundedCornerShape(11.dp))
-                .padding(horizontal = 12.dp, vertical = 10.dp),
+                .background(Palette.Surface, Radius.M)
+                .padding(horizontal = 12.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Switch(on) { switches.toggle(t) }
-            Spacer(Modifier.width(14.dp))
+            Spacer(Modifier.width(16.dp))
             Column(Modifier.weight(1f)) {
-                Text(t.name, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = if (on) Palette.Text else Palette.Muted)
+                Text(t.name, fontSize = Type.Body, fontWeight = FontWeight.SemiBold, color = if (on) Palette.Text else Palette.Muted)
                 val login = when {
                     !t.requiresSignIn -> stringResource(R.string.tracker_no_login)
                     t.isSignedIn -> stringResource(R.string.tracker_connected)
                     else -> stringResource(R.string.tracker_not_connected)
                 }
-                Text(if (on) login else stringResource(R.string.tracker_off), fontSize = 11.sp, color = Palette.Muted)
+                Text(if (on) login else stringResource(R.string.tracker_off), fontSize = Type.Caption, color = Palette.Muted)
             }
             if (t.requiresSignIn) {
                 if (t.isSignedIn) TvButton(stringResource(R.string.sign_out), { onSignOut(t) })
@@ -293,15 +293,15 @@ private fun TrackersSection(trackers: List<TrackerProvider>, switches: TrackerSw
     Row(
         Modifier
             .fillMaxWidth()
-            .border(1.dp, Palette.Line, RoundedCornerShape(11.dp))
+            .border(1.dp, Palette.Line, Radius.M)
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         TvIcon(Icon.Plus, Palette.Muted, 15.dp)
-        Spacer(Modifier.width(14.dp))
+        Spacer(Modifier.width(16.dp))
         Column {
-            Text(stringResource(R.string.add_tracker), fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = Palette.Text)
-            Text(stringResource(R.string.add_tracker_hint), fontSize = 11.sp, color = Palette.Muted)
+            Text(stringResource(R.string.add_tracker), fontSize = Type.Caption, fontWeight = FontWeight.SemiBold, color = Palette.Text)
+            Text(stringResource(R.string.add_tracker_hint), fontSize = Type.Caption, color = Palette.Muted)
         }
     }
 }
@@ -312,18 +312,18 @@ private fun TrackersSection(trackers: List<TrackerProvider>, switches: TrackerSw
 private fun ShelfSections(trackers: List<TrackerProvider>, switches: SectionSwitches) {
     val withShelves = trackers.filter { it.sections.isNotEmpty() || it.requiresSignIn }
     if (withShelves.isEmpty()) return
-    Spacer(Modifier.height(14.dp))
+    Spacer(Modifier.height(16.dp))
     SectionHeader(stringResource(R.string.settings_sections))
     withShelves.forEach { t ->
-        Text(stringResource(R.string.settings_sections_hint, t.name), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Palette.Muted)
+        Text(stringResource(R.string.settings_sections_hint, t.name), fontSize = Type.Caption, fontWeight = FontWeight.SemiBold, color = Palette.Muted)
         if (t.sections.isEmpty()) {
-            Text(stringResource(R.string.settings_sections_later, t.name), fontSize = 11.sp, color = Palette.Muted)
+            Text(stringResource(R.string.settings_sections_later, t.name), fontSize = Type.Caption, color = Palette.Muted)
         } else {
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(7.dp), verticalArrangement = Arrangement.spacedBy(7.dp), modifier = Modifier.padding(2.dp)) {
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(2.dp)) {
                 t.sections.forEach { s -> TvButton(s.title, { switches.toggle(t, s) }, selected = switches.isOn(t, s)) }
             }
         }
-        Spacer(Modifier.height(6.dp))
+        Spacer(Modifier.height(8.dp))
     }
 }
 
@@ -337,7 +337,7 @@ private fun Switch(on: Boolean, onToggle: () -> Unit) {
         border = ClickableSurfaceDefaults.border(focusedBorder = Border(BorderStroke(2.dp, Palette.Accent), shape = CircleShape)),
     ) {
         Box(
-            Modifier.padding(5.dp).size(38.dp, 22.dp).background(if (on) Palette.Accent else Palette.SurfaceHi, CircleShape).padding(3.dp),
+            Modifier.padding(4.dp).size(38.dp, 22.dp).background(if (on) Palette.Accent else Palette.SurfaceHi, CircleShape).padding(4.dp),
             contentAlignment = if (on) Alignment.CenterEnd else Alignment.CenterStart,
         ) {
             Box(Modifier.size(16.dp).background(Color.White, CircleShape))
@@ -359,18 +359,18 @@ private fun TorrServerSection(version: String?) {
     Row(
         Modifier
             .fillMaxWidth()
-            .background(Palette.Surface, RoundedCornerShape(11.dp))
+            .background(Palette.Surface, Radius.M)
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(Modifier.size(9.dp).background(if (version != null) Palette.Good else Palette.Accent, CircleShape))
-        Spacer(Modifier.width(14.dp))
+        Spacer(Modifier.width(16.dp))
         Column(Modifier.weight(1f)) {
             Text(
                 stringResource(if (version != null) R.string.torrserver_running else R.string.server_down),
-                fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = Palette.Text,
+                fontSize = Type.Body, fontWeight = FontWeight.SemiBold, color = Palette.Text,
             )
-            Text(listOfNotNull(version, "127.0.0.1:8090").joinToString(" · "), fontSize = 11.sp, color = Palette.Muted)
+            Text(listOfNotNull(version, "127.0.0.1:8090").joinToString(" · "), fontSize = Type.Caption, color = Palette.Muted)
         }
         val open = launch
         if (open != null) {
@@ -380,13 +380,18 @@ private fun TorrServerSection(version: String?) {
         InstallTorrServeButton(reinstall = open != null)
     }
     Spacer(Modifier.height(4.dp))
-    Text(stringResource(R.string.torrserver_help_title).uppercase(), fontSize = 11.sp, fontWeight = FontWeight.Medium, color = Palette.Muted, letterSpacing = 1.sp)
-    Text(stringResource(R.string.torrserver_help, TORRSERVE_CODE), fontSize = 13.sp, color = Palette.Muted, lineHeight = 21.sp, modifier = Modifier.width(600.dp))
+    Text(stringResource(R.string.torrserver_help_title).uppercase(), fontSize = Type.Caption, fontWeight = FontWeight.Medium, color = Palette.Muted, letterSpacing = 1.sp)
+    Text(stringResource(R.string.torrserver_help, TORRSERVE_CODE), fontSize = Type.Caption, color = Palette.Muted, lineHeight = Type.CaptionLine, modifier = Modifier.width(600.dp))
 }
 
 /** Downloads the latest TorrServe from GitHub and installs it (over the installed one if [reinstall]). */
 @Composable
-internal fun InstallTorrServeButton(reinstall: Boolean, primary: Boolean = !reinstall) {
+internal fun InstallTorrServeButton(
+    reinstall: Boolean,
+    primary: Boolean = !reinstall,
+    modifier: Modifier = Modifier,
+    large: Boolean = false,
+) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var installing by remember { mutableStateOf(false) }
@@ -405,7 +410,7 @@ internal fun InstallTorrServeButton(reinstall: Boolean, primary: Boolean = !rein
             failed = runCatching { ApkInstaller.install(context, apk) }.isFailure
             installing = false
         }
-    }, primary = primary, icon = Icon.Download)
+    }, modifier, primary = primary, large = large, icon = Icon.Download)
 }
 
 @Composable
@@ -451,13 +456,13 @@ private fun AboutSection(update: UpdateState?, onUpdate: () -> Unit, onCheckUpda
             TvButton(stringResource(R.string.about_check_updates), { scope.launch { upToDate = !onCheckUpdates() } })
             if (upToDate) {
                 Spacer(Modifier.width(12.dp))
-                Text(stringResource(R.string.about_up_to_date), fontSize = 13.sp, color = Palette.Good)
+                Text(stringResource(R.string.about_up_to_date), fontSize = Type.Caption, color = Palette.Good)
             }
         }
     }
-    Spacer(Modifier.height(6.dp))
-    Text(stringResource(R.string.about_source, "github.com/nindzyago/torrento-drive"), fontSize = 13.sp, color = Palette.Muted)
-    Text(stringResource(R.string.about_license), fontSize = 13.sp, color = Palette.Muted)
+    Spacer(Modifier.height(8.dp))
+    Text(stringResource(R.string.about_source, "github.com/nindzyago/torrento-drive"), fontSize = Type.Caption, color = Palette.Muted)
+    Text(stringResource(R.string.about_license), fontSize = Type.Caption, color = Palette.Muted)
 }
 
 internal fun torrServeLaunch(context: Context): Intent? = context.packageManager.run {

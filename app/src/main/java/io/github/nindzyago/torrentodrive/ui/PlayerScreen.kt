@@ -44,6 +44,7 @@ import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -61,6 +62,7 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import androidx.tv.material3.Text
 import io.github.nindzyago.torrentodrive.Progress
+import io.github.nindzyago.torrentodrive.ExternalPlayer
 import io.github.nindzyago.torrentodrive.R
 import io.github.nindzyago.torrentodrive.torrserver.TorrentFile
 import io.github.nindzyago.torrentodrive.torrserver.TorrentStats
@@ -95,6 +97,8 @@ internal fun PlayerScreen(
     onExit: () -> Unit,
 ) {
     val context = LocalContext.current
+    /** Another app can play the stream: without one, "Other player" would only end in a system error. */
+    val hasExternal = remember { ExternalPlayer.available(context) }
     val player = remember { ExoPlayer.Builder(context).setSeekBackIncrementMs(SEEK_STEP_MS).setSeekForwardIncrementMs(SEEK_STEP_MS).build() }
 
     var file by remember { mutableStateOf(start) }
@@ -323,7 +327,7 @@ internal fun PlayerScreen(
                 onFromStart = { player.seekTo(0); resumedFrom = null },
                 onAudio = { cycleTrack(player, tracks, C.TRACK_TYPE_AUDIO, allowOff = false) },
                 onSubtitles = { cycleTrack(player, tracks, C.TRACK_TYPE_TEXT, allowOff = true) },
-                onExternal = { save(); onExternal(file) },
+                onExternal = if (hasExternal) { { save(); onExternal(file) } } else null,
             )
         }
 
@@ -340,7 +344,15 @@ internal fun PlayerScreen(
         }
 
         error?.let { msg ->
-            ErrorPanel(msg, errorFocus, onExternal = { save(); onExternal(file) }, onBack = onExit, modifier = Modifier.align(Alignment.Center))
+            ErrorPanel(
+                msg,
+                errorFocus,
+                onExternal = if (hasExternal) { { save(); onExternal(file) } } else null,
+                // after an error the player is idle; prepare() tries the same file again from where it stopped
+                onRetry = { save(); error = null; player.prepare(); player.play() },
+                onBack = onExit,
+                modifier = Modifier.align(Alignment.Center),
+            )
         }
     }
 }
@@ -367,7 +379,8 @@ private fun Overlay(
     onFromStart: () -> Unit,
     onAudio: () -> Unit,
     onSubtitles: () -> Unit,
-    onExternal: () -> Unit,
+    /** Null when no other app can play video: the button is not shown. */
+    onExternal: (() -> Unit)?,
 ) {
     Box(Modifier.fillMaxSize()) {
         // top: what is playing
@@ -375,16 +388,16 @@ private fun Overlay(
             Modifier
                 .fillMaxWidth()
                 .background(Brush.verticalGradient(listOf(Color(0xCC000000), Color.Transparent)))
-                .padding(start = 42.dp, end = 42.dp, top = 27.dp, bottom = 40.dp),
+                .padding(start = 44.dp, end = 44.dp, top = 28.dp, bottom = 40.dp),
         ) {
-            Text(title, fontSize = 13.sp, color = Palette.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(title, fontSize = Type.Caption, color = Palette.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Spacer(Modifier.height(4.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 if (count > 1) {
                     Tag(stringResource(R.string.player_episode_of, index + 1, count), Palette.AccentSoft)
-                    Spacer(Modifier.width(10.dp))
+                    Spacer(Modifier.width(12.dp))
                 }
-                Text(file.name, fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Palette.Text, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(file.name, fontSize = Type.Title, fontWeight = FontWeight.Bold, color = Palette.Text, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
 
@@ -394,10 +407,10 @@ private fun Overlay(
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
                 .background(Brush.verticalGradient(listOf(Color.Transparent, Color(0xE6000000))))
-                .padding(start = 42.dp, end = 42.dp, top = 50.dp, bottom = 27.dp),
+                .padding(start = 44.dp, end = 44.dp, top = 52.dp, bottom = 28.dp),
         ) {
             SeekBar(position, duration, buffered, onSeek)
-            Spacer(Modifier.height(14.dp))
+            Spacer(Modifier.height(16.dp))
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (hasPrev) TvButton(stringResource(R.string.player_prev), onPrev, icon = Icon.Prev)
                 TvButton(
@@ -409,8 +422,8 @@ private fun Overlay(
                 )
                 if (hasNext) TvButton(stringResource(R.string.player_next), onNext, icon = Icon.Next)
                 if (resumedFrom != null) {
-                    Spacer(Modifier.width(6.dp))
-                    Text(stringResource(R.string.player_resumed, formatTime(resumedFrom)), fontSize = 11.sp, color = Palette.Muted)
+                    Spacer(Modifier.width(8.dp))
+                    Text(stringResource(R.string.player_resumed, formatTime(resumedFrom)), fontSize = Type.Caption, color = Palette.Muted)
                     TvButton(stringResource(R.string.player_from_start), onFromStart)
                 }
                 Spacer(Modifier.weight(1f))
@@ -420,7 +433,7 @@ private fun Overlay(
                 if (subs.isNotEmpty()) {
                     TvButton(stringResource(R.string.player_subs, subs.firstOrNull { it.selected }?.label ?: stringResource(R.string.player_off)), onSubtitles)
                 }
-                TvButton(stringResource(R.string.player_external), onExternal)
+                if (onExternal != null) TvButton(stringResource(R.string.player_external), onExternal)
             }
         }
     }
@@ -446,18 +459,18 @@ private fun SeekBar(position: Long, duration: Long, buffered: Long, onSeek: (Lon
                     }
                 }
                 .focusable()
-                .background(Palette.Glass, RoundedCornerShape(4.dp))
-                .then(if (focused) Modifier.border(1.dp, Palette.Accent, RoundedCornerShape(4.dp)) else Modifier),
+                .background(Palette.Glass, Radius.S)
+                .then(if (focused) Modifier.border(1.dp, Palette.Accent, Radius.S) else Modifier),
         ) {
             val total = duration.coerceAtLeast(1L).toFloat()
-            Box(Modifier.fillMaxWidth((buffered / total).coerceIn(0f, 1f)).height(if (focused) 8.dp else 5.dp).background(Color(0x33FFFFFF), RoundedCornerShape(4.dp)))
-            Box(Modifier.fillMaxWidth((position / total).coerceIn(0f, 1f)).height(if (focused) 8.dp else 5.dp).background(Palette.Accent, RoundedCornerShape(4.dp)))
+            Box(Modifier.fillMaxWidth((buffered / total).coerceIn(0f, 1f)).height(if (focused) 8.dp else 5.dp).background(Color(0x33FFFFFF), Radius.S))
+            Box(Modifier.fillMaxWidth((position / total).coerceIn(0f, 1f)).height(if (focused) 8.dp else 5.dp).background(Palette.Accent, Radius.S))
         }
-        Spacer(Modifier.height(6.dp))
+        Spacer(Modifier.height(8.dp))
         Row {
-            Text(formatTime(position), fontSize = 12.sp, color = Palette.Text)
+            Text(formatTime(position), fontSize = Type.Caption, color = Palette.Text)
             Spacer(Modifier.weight(1f))
-            Text(if (duration > 0) "−" + formatTime(duration - position) + " · " + formatTime(duration) else "", fontSize = 12.sp, color = Palette.Muted)
+            Text(if (duration > 0) "−" + formatTime(duration - position) + " · " + formatTime(duration) else "", fontSize = Type.Caption, color = Palette.Muted)
         }
     }
 }
@@ -475,13 +488,13 @@ private fun NextEpisodeCard(
     Column(
         modifier
             .width(340.dp)
-            .background(Color(0xF0181A20), RoundedCornerShape(12.dp))
-            .border(1.dp, Palette.Line, RoundedCornerShape(12.dp))
+            .background(Color(0xF0181A20), Radius.M)
+            .border(1.dp, Palette.Line, Radius.M)
             .padding(16.dp),
     ) {
-        Text(stringResource(R.string.next_in, secondsLeft), fontSize = 12.sp, color = Palette.AccentSoft)
+        Text(stringResource(R.string.next_in, secondsLeft), fontSize = Type.Caption, color = Palette.AccentSoft)
         Spacer(Modifier.height(4.dp))
-        Text(stringResource(R.string.next_label, number, next.name), fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = Palette.Text, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        Text(stringResource(R.string.next_label, number, next.name), fontSize = Type.Body, fontWeight = FontWeight.SemiBold, color = Palette.Text, maxLines = 2, overflow = TextOverflow.Ellipsis)
         Spacer(Modifier.height(12.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             TvButton(stringResource(R.string.next_play), onPlay, Modifier.focusRequester(focus), primary = true, icon = Icon.Next)
@@ -494,16 +507,16 @@ private fun NextEpisodeCard(
 private fun BufferingBadge(stats: TorrentStats?, modifier: Modifier = Modifier) {
     Column(
         modifier
-            .background(Color(0xCC0B0C10), RoundedCornerShape(12.dp))
-            .padding(horizontal = 22.dp, vertical = 14.dp),
+            .background(Color(0xCC0B0C10), Radius.M)
+            .padding(horizontal = 24.dp, vertical = 16.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Text(stringResource(R.string.player_buffering), fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = Palette.Text)
+        Text(stringResource(R.string.player_buffering), fontSize = Type.Body, fontWeight = FontWeight.SemiBold, color = Palette.Text)
         stats?.let {
             Spacer(Modifier.height(4.dp))
             Text(
-                "${stringResource(R.string.seeds_dot, it.seeders)} · ${formatSpeed(it.speedBytes)}",
-                fontSize = 11.sp,
+                "${pluralStringResource(R.plurals.seeds_dot, it.seeders, it.seeders)} · ${formatSpeed(it.speedBytes)}",
+                fontSize = Type.Caption,
                 color = seedColor(it.seeders),
             )
         }
@@ -511,17 +524,29 @@ private fun BufferingBadge(stats: TorrentStats?, modifier: Modifier = Modifier) 
 }
 
 @Composable
-private fun ErrorPanel(message: String, focus: FocusRequester, onExternal: () -> Unit, onBack: () -> Unit, modifier: Modifier = Modifier) {
+private fun ErrorPanel(
+    message: String,
+    focus: FocusRequester,
+    onExternal: (() -> Unit)?,
+    onRetry: () -> Unit,
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     Column(
         modifier
             .width(520.dp)
-            .background(Palette.Surface, RoundedCornerShape(12.dp))
-            .padding(22.dp),
+            .background(Palette.Surface, Radius.M)
+            .padding(24.dp),
     ) {
-        Text(stringResource(R.string.player_error, message), fontSize = 15.sp, color = Palette.Text)
-        Spacer(Modifier.height(14.dp))
+        Text(stringResource(R.string.player_error, message), fontSize = Type.Body, color = Palette.Text)
+        Spacer(Modifier.height(16.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            TvButton(stringResource(R.string.player_external), onExternal, Modifier.focusRequester(focus), primary = true)
+            // the recommended way out goes first and takes focus: another player if there is one, otherwise try again
+            if (onExternal != null) {
+                TvButton(stringResource(R.string.player_external), onExternal, Modifier.focusRequester(focus), primary = true)
+            } else {
+                TvButton(stringResource(R.string.try_again), onRetry, Modifier.focusRequester(focus), primary = true)
+            }
             TvButton(stringResource(R.string.player_back), onBack)
         }
     }

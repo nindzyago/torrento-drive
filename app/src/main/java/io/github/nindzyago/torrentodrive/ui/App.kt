@@ -47,10 +47,20 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.focus.focusProperties
+import androidx.compose.foundation.focusGroup
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.draw.clip
 import io.github.nindzyago.torrentodrive.QuerySource
 import io.github.nindzyago.torrentodrive.SearchHistory
@@ -109,6 +119,8 @@ private sealed interface Screen {
         val items: List<TorrentItem>? = null,
         /** Errors from individual trackers: the remaining results are still shown. */
         val notes: List<String> = emptyList(),
+        /** Names of the trackers being asked, for the loading state. */
+        val searching: List<String> = emptyList(),
     ) : Screen
     data class Files(
         /** Where we came from: search results, or (null) the home screen's "Continue watching". */
@@ -117,6 +129,8 @@ private sealed interface Screen {
         val hash: String? = null,
         val files: List<TorrentFile>? = null,
         val error: String? = null,
+        /** The [error] is TorrServer not answering: offer to start or install TorrServe. */
+        val serverDown: Boolean = false,
         val stats: TorrentStats? = null,
         /** Poster from the torrent description. */
         val poster: String? = null,
@@ -169,15 +183,18 @@ fun App(
         val query = SearchQuery.parse(phrase)
         if (query.text.isBlank()) return
         searches.add(source, phrase)
-        val results = Screen.Results(query)
+        // trackers that need a sign-in that isn't there are not asked at all, only noted
+        val plan = Trackers.searchPlan(trackers, switches::isOn)
+        val signInNotes = plan.needSignIn.map { context.getString(R.string.login_required, it.name) }
+        val results = Screen.Results(query, notes = signInNotes, searching = plan.ask.map { it.name })
         screen = results
         scope.launch {
             Connection.awaitReady()
             val found = coroutineScope {
-                trackers.filter(switches::isOn).map { t -> async { t.name to runCatching { t.search(query.text) } } }.awaitAll()
+                plan.ask.map { t -> async { t.name to runCatching { t.search(query.text) } } }.awaitAll()
             }
             val items = found.flatMap { it.second.getOrDefault(emptyList()) }
-            val notes = found.mapNotNull { (name, r) ->
+            val notes = signInNotes + found.mapNotNull { (name, r) ->
                 r.exceptionOrNull()?.let { e ->
                     if (e is LoginRequired) context.getString(R.string.login_required, name)
                     else context.getString(R.string.tracker_error, name, e.message ?: e.toString())
@@ -229,9 +246,9 @@ fun App(
         }
     }
 
-    /** Opens a torrent; [resumeIndex] starts that file right away (resuming from history). */
-    fun open(from: Screen.Results?, item: TorrentItem, resumeIndex: Int? = null) {
-        var files = Screen.Files(from, item)
+    /** Opens a torrent; [resumeIndex] starts that file right away (resuming from history); [retry] keeps its poster and details. */
+    fun open(from: Screen.Results?, item: TorrentItem, resumeIndex: Int? = null, retry: Screen.Files? = null) {
+        var files = Screen.Files(from, item, poster = retry?.poster, details = retry?.details)
         screen = files
         fun update(next: Screen.Files) {
             if ((screen as? Screen.Files)?.item == item) screen = next
@@ -260,7 +277,9 @@ fun App(
                 // only "Continue watching" starts by itself; anything else waits on the Watch button
                 if (resumed != null && (screen as? Screen.Files)?.item == item) load(files, resumed)
             } catch (e: Exception) {
-                update(files.copy(error = e.message ?: e.toString()))
+                // a tracker that can't be reached is only TorrServer's fault if TorrServer is silent too
+                val serverDown = TorrServerClient.isUnreachable(e) || !server.isAlive()
+                update(files.copy(error = e.message ?: e.toString(), serverDown = serverDown))
             }
         }
     }
@@ -368,7 +387,7 @@ fun App(
                   is Screen.Loading -> PosterBackdrop(s.from.poster)
                   else -> Unit
               }
-              Box(Modifier.fillMaxSize().padding(horizontal = 42.dp, vertical = 27.dp)) {
+              Box(Modifier.fillMaxSize().padding(horizontal = ScreenGutter, vertical = 28.dp)) {
                 when (val s = screen) {
                     Screen.Home -> HomeScreen(
                         serverAlive = serverAlive,
@@ -423,10 +442,12 @@ fun App(
                     )
                     is Screen.Results -> ResultsScreen(s, onOpen = { open(s, it) })
                     is Screen.Files -> ReleaseScreen(
-                        Release(s.item, s.poster, s.details, s.files, s.error, s.stats),
+                        Release(s.item, s.poster, s.details, s.files, s.error, s.stats, s.serverDown),
                         watched = history.entries.firstOrNull { it.item.trackerId == s.item.trackerId && it.item.link == s.item.link },
                         progressOf = { progress.get(s.item, it.index) },
                         onPlay = { file -> load(s, file) },
+                        onRetry = { open(s.from, s.item, retry = s) },
+                        onBack = { screen = s.from ?: Screen.Home },
                     )
                     is Screen.Loading -> LoadingScreen(s, onPlayNow = { startPlayback(s.from, s.file) })
                     is Screen.Player -> Unit
@@ -442,16 +463,16 @@ fun App(
                         .fillMaxWidth()
                         .height(56.dp)
                         .background(Palette.Bg)
-                        .padding(horizontal = 21.dp),
+                        .padding(horizontal = 20.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     TvIcon(Icon.Lock, Palette.Good, 14.dp)
-                    Text("rutracker.org", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Palette.Text)
-                    Text(stringResource(R.string.login_bar_hint), fontSize = 11.sp, color = Palette.Muted)
+                    Text("rutracker.org", fontSize = Type.Caption, fontWeight = FontWeight.SemiBold, color = Palette.Text)
+                    Text(stringResource(R.string.login_bar_hint), fontSize = Type.Caption, color = Palette.Muted)
                     Spacer(Modifier.weight(1f))
                     listOf(stringResource(R.string.key_arrows), stringResource(R.string.key_ok), stringResource(R.string.key_back)).forEach {
-                        Text(it, fontSize = 10.sp, color = Palette.Muted, modifier = Modifier.border(1.dp, Palette.Line, RoundedCornerShape(5.dp)).padding(horizontal = 6.dp, vertical = 3.dp))
+                        Text(it, fontSize = Type.Caption, color = Palette.Muted, modifier = Modifier.border(1.dp, Palette.Line, Radius.S).padding(horizontal = 8.dp, vertical = 4.dp))
                     }
                 }
             }
@@ -462,7 +483,7 @@ fun App(
                 Text(
                     stringResource(R.string.challenge_hint, "RuTracker"),
                     color = Palette.Text,
-                    fontSize = 18.sp,
+                    fontSize = Type.Title,
                     modifier = Modifier
                         .zIndex(3f)
                         .align(Alignment.BottomCenter)
@@ -495,16 +516,53 @@ private fun HomeScreen(
     onOpenShelf: (TorrentItem, PanelReturn) -> Unit,
 ) {
     val voiceFocus = remember { FocusRequester() }
+    val setupFocus = remember { FocusRequester() }
+    val updateFocus = remember { FocusRequester() }
+    val settingsFocus = remember { FocusRequester() }
     var typed by remember { mutableStateOf("") }
     var voiceFocused by remember { mutableStateOf(false) }
+    var setupFocused by remember { mutableStateOf(false) }
+    // the open panel needs the room; the setup card comes back when focus leaves it
+    var panelOpen by remember { mutableStateOf(false) }
+    val setupShown = serverAlive == false && !panelOpen
+    // focus goes to the setup card's button as soon as the card is on screen
+    var wantSetupFocus by remember { mutableStateOf(false) }
     val restore = remember { panelReturn }
-    LaunchedEffect(Unit) {
-        if (restore == null) voiceFocus.requestFocus() else onPanelReturnUsed()
+    val serverAtStart = remember { serverAlive }
+
+    /** The home screen's initial focus: the setup card's button while TorrServer is missing, otherwise Speak. */
+    fun focusHome() {
+        if (serverAlive == false) {
+            wantSetupFocus = true
+            // the card is hidden while the panel is open: leaving the panel brings it back
+            if (panelOpen) runCatching { voiceFocus.requestFocus() }
+        } else {
+            runCatching { voiceFocus.requestFocus() }
+        }
     }
-    // Back from anywhere else on the home screen returns to the initial state; Back on the voice button exits the app
-    BackHandler(enabled = backEnabled && !voiceFocused) {
+
+    LaunchedEffect(Unit) {
+        if (restore == null) focusHome() else onPanelReturnUsed()
+    }
+    LaunchedEffect(setupShown, wantSetupFocus) {
+        if (setupShown && wantSetupFocus) {
+            runCatching { setupFocus.requestFocus() }
+            wantSetupFocus = false
+        }
+    }
+    LaunchedEffect(serverAlive) {
+        when {
+            // the first check found no TorrServer while focus still sits where the screen put it
+            serverAlive == false && serverAtStart == null && restore == null && voiceFocused -> focusHome()
+            // TorrServer came up: the card and its focused button are gone
+            serverAlive == true && setupFocused -> runCatching { voiceFocus.requestFocus() }
+        }
+    }
+    val homeFocused = if (serverAlive == false) setupFocused else voiceFocused
+    // Back from anywhere else on the home screen returns to the initial state; Back on the initial element exits the app
+    BackHandler(enabled = backEnabled && !homeFocused) {
         typed = ""
-        voiceFocus.requestFocus()
+        focusHome()
     }
 
     Column(Modifier.fillMaxSize()) {
@@ -517,29 +575,29 @@ private fun HomeScreen(
                 false -> Palette.Accent to stringResource(R.string.server_down)
             }
             Box(Modifier.size(6.dp).background(dot, CircleShape))
-            Spacer(Modifier.width(6.dp))
-            Text(label, fontSize = 11.sp, color = Palette.Muted)
+            Spacer(Modifier.width(8.dp))
+            Text(label, fontSize = Type.Caption, color = Palette.Muted)
             if (unreachable.isNotEmpty()) {
                 Spacer(Modifier.width(16.dp))
                 Box(Modifier.size(6.dp).background(Palette.Warn, CircleShape))
-                Spacer(Modifier.width(6.dp))
-                Text(stringResource(R.string.trackers_unreachable, unreachable.joinToString(", ")), fontSize = 11.sp, color = Palette.Warn)
+                Spacer(Modifier.width(8.dp))
+                Text(stringResource(R.string.trackers_unreachable, unreachable.joinToString(", ")), fontSize = Type.Caption, color = Palette.Warn)
             }
-            Spacer(Modifier.width(18.dp))
+            Spacer(Modifier.width(20.dp))
             if (update != null) {
                 val label = when {
                     update.busy -> stringResource(R.string.update_downloading)
                     update.failed -> stringResource(R.string.update_failed)
                     else -> stringResource(R.string.update_available, update.update.version)
                 }
-                TvButton(label, onUpdate, icon = Icon.Download)
-                Spacer(Modifier.width(10.dp))
+                TvButton(label, onUpdate, Modifier.focusRequester(updateFocus), icon = Icon.Download)
+                Spacer(Modifier.width(12.dp))
             }
-            TvIconButton(Icon.Gear, stringResource(R.string.settings), onSettings)
+            TvIconButton(Icon.Gear, stringResource(R.string.settings), onSettings, Modifier.focusRequester(settingsFocus))
         }
         Spacer(Modifier.height(48.dp))
-        Text(stringResource(R.string.home_title), fontSize = 39.sp, fontWeight = FontWeight.Bold, color = Palette.Text, letterSpacing = (-0.5).sp)
-        Spacer(Modifier.height(18.dp))
+        Text(stringResource(R.string.home_title), fontSize = Type.Hero, fontWeight = FontWeight.Bold, color = Palette.Text, letterSpacing = (-0.5).sp)
+        Spacer(Modifier.height(20.dp))
         // search history shows only while the text field or the suggestions themselves have focus, not the voice button
         var fieldFocused by remember { mutableStateOf(false) }
         var suggestionsFocused by remember { mutableStateOf(false) }
@@ -549,10 +607,14 @@ private fun HomeScreen(
                 Modifier.focusRequester(voiceFocus).onFocusChanged { voiceFocused = it.isFocused },
                 primary = true, large = true, icon = Icon.Mic,
             )
-            Spacer(Modifier.width(10.dp))
+            Spacer(Modifier.width(12.dp))
             TvTextField(
                 typed, { typed = it }, stringResource(R.string.search_hint),
-                Modifier.width(345.dp).onFocusChanged { fieldFocused = it.isFocused },
+                Modifier
+                    .width(345.dp)
+                    .onFocusChanged { fieldFocused = it.hasFocus }
+                    // Right goes up to the header buttons, not to a search suggestion that happens to stick out below
+                    .focusProperties { right = if (update != null) updateFocus else settingsFocus },
                 imeAction = ImeAction.Search,
                 onImeAction = { onSearch(typed, QuerySource.Typed) },
             )
@@ -563,19 +625,19 @@ private fun HomeScreen(
                 RecentQueries(stringResource(R.string.recent_spoken), Icon.Mic, searches.voice) { onSearch(it, QuerySource.Voice) }
             }
         }
-        // the open panel needs the room; the setup card comes back when focus leaves it
-        var panelOpen by remember { mutableStateOf(false) }
-        if (serverAlive == false && !panelOpen) ServerSetup()
+        if (setupShown) {
+            ServerSetup(Modifier.focusRequester(setupFocus).onFocusChanged { setupFocused = it.isFocused })
+        }
         Spacer(Modifier.weight(1f))
         HomePanel(
             shelfView = shelfView,
             restore = restore,
             onOpen = onOpenShelf,
             continueEmpty = history.isEmpty(),
-            onRestoreFailed = { runCatching { voiceFocus.requestFocus() } },
+            onRestoreFailed = { focusHome() },
             onOpenChange = { panelOpen = it },
             continueContent = { firstCard ->
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(14.dp), contentPadding = PaddingValues(vertical = 6.dp, horizontal = 4.dp)) {
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(16.dp), contentPadding = PaddingValues(top = 6.dp, bottom = 6.dp, start = 4.dp, end = ScreenGutter)) {
                     itemsIndexed(history, key = { _, e -> "${e.item.trackerId}:${e.item.link}" }) { i, e ->
                         HistoryCard(e, progressOf(e), if (i == 0) Modifier.focusRequester(firstCard) else Modifier, onClick = { onResume(e) })
                     }
@@ -588,37 +650,50 @@ private fun HomeScreen(
 /** A newer release found on GitHub and where its installation stands. */
 internal data class UpdateState(val update: Update, val busy: Boolean = false, val failed: Boolean = false)
 
-/** Shown while TorrServer doesn't answer: how to install or start TorrServe. */
+/**
+ * Shown while TorrServer doesn't answer: how to install or start TorrServe.
+ * [buttonModifier] goes on the card's button (the home screen's initial focus while the card is shown).
+ */
 @Composable
-private fun ServerSetup() {
+private fun ServerSetup(buttonModifier: Modifier) {
     val context = LocalContext.current
     var launch by remember { mutableStateOf(torrServeLaunch(context)) }
+    var buttonFocused by remember { mutableStateOf(false) }
+    val buttonFocus = remember { FocusRequester() }
     // notice TorrServe being installed while the card is on screen
     LaunchedEffect(Unit) {
         while (launch == null) {
             delay(2000)
-            launch = torrServeLaunch(context)
+            val found = torrServeLaunch(context) ?: continue
+            // Install turns into Open: keep focus on the button if it was there
+            val hadFocus = buttonFocused
+            launch = found
+            if (hadFocus) {
+                withFrameNanos { }
+                runCatching { buttonFocus.requestFocus() }
+            }
         }
     }
+    val button = buttonModifier.focusRequester(buttonFocus).onFocusChanged { buttonFocused = it.isFocused }
     Column(
         Modifier
             .padding(top = 24.dp)
             .width(560.dp)
-            .background(Palette.Bg.copy(alpha = 0.82f), RoundedCornerShape(16.dp))
+            .background(Palette.Bg.copy(alpha = 0.82f), Radius.L)
             .padding(20.dp),
     ) {
-        Text(stringResource(R.string.server_setup_title), fontSize = 17.sp, fontWeight = FontWeight.Bold, color = Palette.Text)
+        Text(stringResource(R.string.server_setup_title), fontSize = Type.Body, fontWeight = FontWeight.Bold, color = Palette.Text)
         Spacer(Modifier.height(8.dp))
         Text(
             stringResource(if (launch != null) R.string.server_setup_start else R.string.server_setup_install, TORRSERVE_CODE),
-            fontSize = 13.sp, color = Palette.Muted, lineHeight = 19.sp,
+            fontSize = Type.Caption, color = Palette.Muted, lineHeight = Type.CaptionLine,
         )
-        Spacer(Modifier.height(14.dp))
+        Spacer(Modifier.height(16.dp))
         val open = launch
         if (open != null) {
-            TvButton(stringResource(R.string.open_torrserve), { context.startActivity(open) }, primary = true)
+            TvButton(stringResource(R.string.open_torrserve), { context.startActivity(open) }, button, primary = true, large = true)
         } else {
-            InstallTorrServeButton(reinstall = false)
+            InstallTorrServeButton(reinstall = false, modifier = button, large = true)
         }
     }
 }
@@ -627,12 +702,12 @@ private fun ServerSetup() {
 @Composable
 private fun RecentQueries(label: String, icon: Icon, queries: List<String>, onPick: (String) -> Unit) {
     if (queries.isEmpty()) return
-    Spacer(Modifier.height(10.dp))
+    Spacer(Modifier.height(12.dp))
     Row(verticalAlignment = Alignment.CenterVertically) {
         TvIcon(icon, Palette.Muted, 12.dp)
-        Spacer(Modifier.width(6.dp))
-        Text(label, fontSize = 11.sp, color = Palette.Muted, modifier = Modifier.width(62.dp))
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(7.dp), contentPadding = PaddingValues(vertical = 2.dp, horizontal = 2.dp)) {
+        Spacer(Modifier.width(8.dp))
+        Text(label, fontSize = Type.Caption, color = Palette.Muted, modifier = Modifier.width(62.dp))
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), contentPadding = PaddingValues(vertical = 2.dp, horizontal = 2.dp)) {
             items(queries, key = { it }) { q -> TvButton(q, { onPick(q) }) }
         }
     }
@@ -643,10 +718,10 @@ private fun HistoryCard(e: WatchEntry, progress: Progress?, modifier: Modifier =
     TvCard(onClick, modifier.width(202.dp)) {
         PosterImage(e.poster, shortTitle(e.item.title), 34.sp, Modifier.fillMaxWidth().height(90.dp))
         if (progress != null) ProgressLine(progress)
-        Column(Modifier.padding(horizontal = 11.dp, vertical = 9.dp)) {
-            Text(shortTitle(e.item.title), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Palette.Text, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Spacer(Modifier.height(3.dp))
-            Text("${e.fileName} · ${ago(e.watchedAt)}", fontSize = 10.sp, color = Palette.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+            Text(shortTitle(e.item.title), fontSize = Type.Caption, fontWeight = FontWeight.SemiBold, color = Palette.Text, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Spacer(Modifier.height(4.dp))
+            Text("${e.fileName} · ${ago(e.watchedAt)}", fontSize = Type.Caption, color = Palette.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
 }
@@ -671,6 +746,7 @@ internal fun qualityOf(title: String): Pair<String, Color>? = when {
     else -> null
 }
 
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 private fun ResultsScreen(s: Screen.Results, onOpen: (TorrentItem) -> Unit) {
     val items = s.items.orEmpty()
@@ -681,33 +757,57 @@ private fun ResultsScreen(s: Screen.Results, onOpen: (TorrentItem) -> Unit) {
 
     Column(Modifier.fillMaxSize()) {
         Row(verticalAlignment = Alignment.Bottom) {
-            Text(s.query.label, fontSize = 28.sp, fontWeight = FontWeight.Bold, color = Palette.Text)
+            Text(s.query.label, fontSize = Type.Headline, fontWeight = FontWeight.Bold, color = Palette.Text)
             Spacer(Modifier.width(12.dp))
             Text(
                 when {
+                    s.items == null && s.searching.isNotEmpty() -> stringResource(R.string.searching_trackers, s.searching.joinToString(", "))
                     s.items == null -> stringResource(R.string.searching)
                     items.isEmpty() -> stringResource(R.string.nothing_found)
                     else -> pluralStringResource(R.plurals.results_count, items.size, items.size) + " · $trackers"
                 },
-                fontSize = 13.sp,
+                fontSize = Type.Caption,
                 color = Palette.Muted,
                 modifier = Modifier.padding(bottom = 4.dp),
             )
         }
-        s.notes.forEach { Text(it, fontSize = 11.sp, color = Palette.Warn) }
-        if (counts.size > 1) {
+        s.notes.forEach { Text(it, fontSize = Type.Caption, color = Palette.Warn) }
+        // one requester per chip: Up from the list lands on the selected chip, not the geometrically nearest one
+        val allChip = remember(s.items) { FocusRequester() }
+        val chipFocus = remember(s.items) { counts.associate { it.first to FocusRequester() } }
+        val selectedChip = category?.let { chipFocus[it] } ?: allChip
+        val hasChips = counts.size > 1
+        if (hasChips) {
             Spacer(Modifier.height(12.dp))
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), contentPadding = PaddingValues(horizontal = 2.dp, vertical = 2.dp)) {
-                item { TvButton(stringResource(R.string.all_count, items.size), { category = null }, selected = category == null) }
-                items(counts, key = { it.first.name }) { (c, n) ->
-                    TvButton("${stringResource(c.label)} · $n", { category = c }, selected = category == c)
+            // moving along the chips only moves focus; the filter changes on OK, and the selected chip keeps its look
+            Row(
+                Modifier
+                    .focusProperties { enter = { selectedChip } }
+                    .focusGroup()
+                    .horizontalScroll(rememberScrollState())
+                    .padding(2.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                TvButton(stringResource(R.string.all_count, items.size), { category = null }, Modifier.focusRequester(allChip), selected = category == null)
+                counts.forEach { (c, n) ->
+                    TvButton("${stringResource(c.label)} · $n", { category = c }, Modifier.focusRequester(chipFocus.getValue(c)), selected = category == c)
                 }
             }
         }
         Spacer(Modifier.height(12.dp))
         val firstFocus = remember { FocusRequester() }
         LaunchedEffect(s.items) { if (items.isNotEmpty()) runCatching { firstFocus.requestFocus() } }
-        LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp), contentPadding = PaddingValues(vertical = 6.dp, horizontal = 4.dp)) {
+        if (s.items == null) {
+            SearchingPlaceholders()
+            return@Column
+        }
+        LazyColumn(
+            Modifier
+                .focusProperties { exit = { if (it == FocusDirection.Up && hasChips) selectedChip else FocusRequester.Default } }
+                .focusGroup(),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            contentPadding = PaddingValues(vertical = 6.dp, horizontal = 4.dp),
+        ) {
             items(shown, key = { "${it.trackerId}:${it.link}" }) { item ->
                 ResultCard(item, onClick = { onOpen(item) }, modifier = if (item === shown.first()) Modifier.focusRequester(firstFocus) else Modifier)
             }
@@ -715,23 +815,63 @@ private fun ResultsScreen(s: Screen.Results, onOpen: (TorrentItem) -> Unit) {
     }
 }
 
+/**
+ * The results screen while trackers are being asked: rows the shape of [ResultCard], so the screen looks like what
+ * is coming, and the first one takes focus so the remote has somewhere to be. OK on them does nothing.
+ */
+@Composable
+private fun SearchingPlaceholders() {
+    val first = remember { FocusRequester() }
+    LaunchedEffect(Unit) { runCatching { first.requestFocus() } }
+    val description = stringResource(R.string.searching)
+    Column(Modifier.padding(vertical = 8.dp, horizontal = 4.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        listOf(0.72f, 0.56f, 0.64f, 0.48f, 0.6f).forEachIndexed { i, width ->
+            TvCard(
+                onClick = {},
+                modifier = (if (i == 0) Modifier.focusRequester(first) else Modifier)
+                    .fillMaxWidth()
+                    .semantics { contentDescription = description },
+            ) {
+                Row(Modifier.padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        PlaceholderBar(Modifier.fillMaxWidth(width).height(16.dp))
+                        Spacer(Modifier.height(8.dp))
+                        PlaceholderBar(Modifier.width(160.dp).height(12.dp))
+                    }
+                    Spacer(Modifier.width(20.dp))
+                    Column(horizontalAlignment = Alignment.End) {
+                        PlaceholderBar(Modifier.width(32.dp).height(20.dp))
+                        Spacer(Modifier.height(4.dp))
+                        PlaceholderBar(Modifier.width(40.dp).height(12.dp))
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PlaceholderBar(modifier: Modifier) {
+    Box(modifier.background(Palette.Glass, Radius.S))
+}
+
 @Composable
 private fun ResultCard(item: TorrentItem, onClick: () -> Unit, modifier: Modifier = Modifier) {
     TvCard(onClick, modifier.fillMaxWidth()) {
-        Row(Modifier.padding(horizontal = 15.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
-                Text(item.title, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = Palette.Text, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                Spacer(Modifier.height(5.dp))
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(item.title, fontSize = Type.Caption, fontWeight = FontWeight.SemiBold, color = Palette.Text, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Spacer(Modifier.height(4.dp))
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     qualityOf(item.title)?.let { (q, c) -> Tag(q, c) }
                     Tag(stringResource(item.category.label))
-                    Text("${item.size} · ${item.tracker}", fontSize = 10.sp, color = Palette.Muted)
+                    Text("${trackerSize(item.size)} · ${item.tracker}", fontSize = Type.Caption, color = Palette.Muted)
                 }
             }
-            Spacer(Modifier.width(18.dp))
+            Spacer(Modifier.width(20.dp))
             Column(horizontalAlignment = Alignment.End) {
-                Text("${item.seeds}", fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = seedColor(item.seeds))
-                Text(stringResource(R.string.seeds_label), fontSize = 9.sp, color = Palette.Muted)
+                Text("${item.seeds}", fontSize = Type.Title, fontWeight = FontWeight.ExtraBold, color = seedColor(item.seeds))
+                Text(pluralStringResource(R.plurals.seeds_label, item.seeds), fontSize = Type.Caption, color = Palette.Muted)
             }
         }
     }
@@ -742,54 +882,54 @@ private fun LoadingScreen(s: Screen.Loading, onPlayNow: () -> Unit) {
     val focus = remember { FocusRequester() }
     LaunchedEffect(Unit) { focus.requestFocus() }
     Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.Center) {
-        Text(shortTitle(s.from.item.title), fontSize = 12.sp, color = Palette.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        Spacer(Modifier.height(6.dp))
-        Text(s.file.name, fontSize = 30.sp, fontWeight = FontWeight.ExtraBold, color = Palette.Text, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.width(700.dp))
+        Text(shortTitle(s.from.item.title), fontSize = Type.Caption, color = Palette.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Spacer(Modifier.height(8.dp))
+        Text(s.file.name, fontSize = Type.Display, fontWeight = FontWeight.ExtraBold, color = Palette.Text, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.width(700.dp))
         Spacer(Modifier.height(28.dp))
         val st = s.stats
         val progress = if (st != null && st.preloadSize > 0) (st.preloaded.toFloat() / st.preloadSize).coerceIn(0f, 1f) else 0f
         Row(Modifier.width(570.dp)) {
-            Text(stringResource(R.string.preparing), fontSize = 12.sp, color = Palette.Text)
+            Text(stringResource(R.string.preparing), fontSize = Type.Caption, color = Palette.Text)
             Spacer(Modifier.weight(1f))
             Text(
                 if (st != null && st.preloadSize > 0) stringResource(R.string.buffer_of, formatSize(st.preloaded), formatSize(st.preloadSize)) else stringResource(R.string.connecting),
-                fontSize = 12.sp,
+                fontSize = Type.Caption,
                 color = Palette.Muted,
             )
         }
         Spacer(Modifier.height(8.dp))
-        Box(Modifier.width(570.dp).height(6.dp).background(Palette.Glass, RoundedCornerShape(3.dp))) {
-            Box(Modifier.fillMaxWidth(progress).height(6.dp).background(Palette.Accent, RoundedCornerShape(3.dp)))
+        Box(Modifier.width(570.dp).height(6.dp).background(Palette.Glass, Radius.S)) {
+            Box(Modifier.fillMaxWidth(progress).height(6.dp).background(Palette.Accent, Radius.S))
         }
-        Spacer(Modifier.height(18.dp))
+        Spacer(Modifier.height(20.dp))
         st?.let { StatsBlock(it) }
         Spacer(Modifier.height(24.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
             TvButton(stringResource(R.string.watch_now), onPlayNow, Modifier.focusRequester(focus), primary = true, large = true, icon = Icon.Play)
             Spacer(Modifier.width(12.dp))
-            Text(stringResource(R.string.player_auto), fontSize = 11.sp, color = Palette.Muted)
+            Text(stringResource(R.string.player_auto), fontSize = Type.Caption, color = Palette.Muted)
         }
     }
 }
 
 @Composable
 private fun StatsBlock(st: TorrentStats) {
-    Row(horizontalArrangement = Arrangement.spacedBy(42.dp)) {
-        Stat("${st.seeders}", stringResource(R.string.seeds_label), seedColor(st.seeders))
+    Row(horizontalArrangement = Arrangement.spacedBy(44.dp)) {
+        Stat("${st.seeders}", pluralStringResource(R.plurals.seeds_label, st.seeders), seedColor(st.seeders))
         Stat("${st.activePeers} / ${st.totalPeers}", stringResource(R.string.peers_label))
         Stat(formatSpeed(st.speedBytes), stringResource(R.string.speed_label))
     }
     if (st.seeders == 0) {
         Spacer(Modifier.height(8.dp))
-        Text(stringResource(R.string.no_seeds), fontSize = 11.sp, color = Palette.Accent)
+        Text(stringResource(R.string.no_seeds), fontSize = Type.Caption, color = Palette.Accent)
     }
 }
 
 @Composable
 private fun Stat(value: String, label: String, color: Color = Palette.Text) {
     Column {
-        Text(value, fontSize = 24.sp, fontWeight = FontWeight.ExtraBold, color = color)
-        Text(label, fontSize = 10.sp, color = Palette.Muted)
+        Text(value, fontSize = Type.Headline, fontWeight = FontWeight.ExtraBold, color = color)
+        Text(label, fontSize = Type.Caption, color = Palette.Muted)
     }
 }
 

@@ -87,9 +87,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun playExternal(url: Uri, file: TorrentFile) {
-        val intent = Intent(Intent.ACTION_VIEW)
-            .setDataAndType(url, "video/*")
-            .putExtra("title", file.name)
+        val intent = ExternalPlayer.intent(url, file.name)
         val nova = intent.clone() as Intent
         nova.setPackage(NOVA_PACKAGE)
         try {
@@ -101,7 +99,7 @@ class MainActivity : ComponentActivity() {
 
     companion object {
         const val EXTRA_QUERY = "query"
-        const val NOVA_PACKAGE = "org.courville.nova"
+        const val NOVA_PACKAGE = ExternalPlayer.NOVA_PACKAGE
 
     }
 }

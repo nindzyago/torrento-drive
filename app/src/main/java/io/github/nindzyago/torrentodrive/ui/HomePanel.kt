@@ -17,9 +17,16 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.CornerSize
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.res.pluralStringResource
+import kotlinx.coroutines.launch
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -54,6 +61,17 @@ import io.github.nindzyago.torrentodrive.R
 import io.github.nindzyago.torrentodrive.Shelf
 import io.github.nindzyago.torrentodrive.trackers.Browse
 import io.github.nindzyago.torrentodrive.trackers.TorrentItem
+
+/** How far the panel sticks out to the left of the content: its own padding plus the tab pill's. */
+private val PanelBleed = 24.dp
+
+/** Rounded only on the left: on the right the panel runs off the screen edge. */
+private val PanelShape = RoundedCornerShape(
+    topStart = Radius.L.topStart,
+    bottomStart = Radius.L.bottomStart,
+    topEnd = CornerSize(0.dp),
+    bottomEnd = CornerSize(0.dp),
+)
 
 /** Tabs of the home screen's bottom panel. */
 internal enum class PanelTab(val label: Int, val kind: Browse?) {
@@ -115,16 +133,21 @@ internal fun HomePanel(
     val tabFocus = remember { PanelTab.entries.associateWith { FocusRequester() } }
     Column(
         Modifier
-            .fillMaxWidth()
             .onFocusChanged {
                 if (open != it.hasFocus) onOpenChange(it.hasFocus)
                 open = it.hasFocus
                 if (it.hasFocus) restoring = false
             }
-            // the panel's padding plus the tab's pill sticks out to the left so the first title lines up with the screen edge
-            .offset(x = (-24).dp)
-            .background(if (open) Palette.Bg.copy(alpha = 0.82f) else Color.Transparent, RoundedCornerShape(16.dp))
-            .padding(horizontal = 12.dp, vertical = 8.dp),
+            // the panel's padding plus the tab's pill sticks out to the left so the first title lines up with the content's edge;
+            // on the right the panel runs to the screen edge, so its rows scroll out under the edge instead of stopping short of it
+            .layout { measurable, constraints ->
+                val left = PanelBleed.roundToPx()
+                val width = constraints.maxWidth + left + ScreenGutter.roundToPx()
+                val placeable = measurable.measure(constraints.copy(minWidth = width, maxWidth = width))
+                layout(constraints.maxWidth, placeable.height) { placeable.place(-left, 0) }
+            }
+            .background(if (open) Palette.Bg.copy(alpha = 0.82f) else Color.Transparent, PanelShape)
+            .padding(start = 12.dp, top = 8.dp, bottom = 8.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             PanelTab.entries.forEach { t ->
@@ -154,11 +177,11 @@ internal fun HomePanel(
         ) {
             // Up from any card goes back to the open tab, not to whatever sits above it on the screen
             Column(Modifier.focusProperties { exit = { if (it == FocusDirection.Up) tabFocus.getValue(tab) else FocusRequester.Default } }.focusGroup()) {
-                Spacer(Modifier.height(10.dp))
+                Spacer(Modifier.height(12.dp))
                 val kind = tab.kind
                 if (kind == null) {
                     if (continueEmpty) {
-                        Text(stringResource(R.string.history_empty), fontSize = 12.sp, color = Palette.Muted, modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp))
+                        Text(stringResource(R.string.history_empty), fontSize = Type.Caption, color = Palette.Muted, modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp))
                     } else {
                         continueContent(firstContinue)
                     }
@@ -176,7 +199,7 @@ private fun PanelTabHandle(modifier: Modifier, label: String, selected: Boolean,
     var focused by remember { mutableStateOf(false) }
     Row(
         modifier
-            .clip(RoundedCornerShape(16.dp))
+            .clip(Radius.L)
             .onFocusChanged {
                 focused = it.isFocused
                 if (it.isFocused) onFocus()
@@ -189,7 +212,7 @@ private fun PanelTabHandle(modifier: Modifier, label: String, selected: Boolean,
                 },
             )
             .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 6.dp),
+            .padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         SectionTitle(label)
@@ -218,37 +241,52 @@ private fun ShelvesTab(
             item { TvButton(stringResource(R.string.shelf_all), { tracker = null }, selected = tracker == null) }
             items(trackers, key = { it }) { t -> TvButton(t, { tracker = t }, selected = tracker == t) }
         }
-        Spacer(Modifier.height(6.dp))
+        Spacer(Modifier.height(8.dp))
     }
-    view.notes.forEach { Text(it, fontSize = 11.sp, color = Palette.Warn, modifier = Modifier.padding(horizontal = 4.dp)) }
-    if (shown.isEmpty()) {
-        Text(
-            stringResource(if (view.loading) R.string.shelves_loading else R.string.shelves_empty),
-            fontSize = 12.sp, color = Palette.Muted, modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-        )
-        return
-    }
-
+    val notes = view.notes
     val restoreShelf = restore?.let { r -> shown.indexOfFirst { s -> s.items.any { itemKey(it) == r.itemKey } } }?.takeIf { it >= 0 }
     val restoreFocus = remember { FocusRequester() }
-    val column = rememberLazyListState(initialFirstVisibleItemIndex = restoreShelf ?: 0)
+    // the notes are the list's first rows: they scroll away with the shelves instead of hanging over them
+    val column = rememberLazyListState(initialFirstVisibleItemIndex = restoreShelf?.let { it + notes.size } ?: 0)
+    val scope = rememberCoroutineScope()
     LaunchedEffect(restore) { if (restore != null && restoreShelf != null) runCatching { restoreFocus.requestFocus() } }
     LazyColumn(
         state = column,
         modifier = Modifier.heightIn(max = 300.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
         contentPadding = PaddingValues(vertical = 4.dp),
     ) {
+        itemsIndexed(notes, key = { i, _ -> "note:$i" }) { _, note ->
+            Text(note, fontSize = Type.Caption, color = Palette.Warn, modifier = Modifier.padding(horizontal = 4.dp))
+        }
+        if (shown.isEmpty()) {
+            item(key = "empty") {
+                Text(
+                    stringResource(if (view.loading) R.string.shelves_loading else R.string.shelves_empty),
+                    fontSize = Type.Caption, color = Palette.Muted, modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                )
+            }
+        }
         itemsIndexed(shown, key = { _, s -> "${s.tracker.id}:${s.section.id}" }) { si, shelf ->
-            Column {
+            // back on the first shelf, the notes above it come back into view too
+            val firstShelf = if (si == 0 && notes.isNotEmpty()) {
+                Modifier.onFocusChanged { if (it.hasFocus && column.firstVisibleItemIndex > 0) scope.launch { column.animateScrollToItem(0) } }
+            } else {
+                Modifier
+            }
+            Column(firstShelf) {
                 Text(
                     "${shelf.tracker.name} · ${shelf.section.title}",
-                    fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Palette.Muted,
-                    modifier = Modifier.padding(start = 4.dp, bottom = 6.dp),
+                    fontSize = Type.Caption, fontWeight = FontWeight.SemiBold, color = Palette.Muted,
+                    modifier = Modifier.padding(start = 4.dp, bottom = 8.dp),
                 )
                 val restoreIndex = if (si == restoreShelf) shelf.items.indexOfFirst { itemKey(it) == restore?.itemKey } else -1
                 val row = rememberLazyListState(initialFirstVisibleItemIndex = restoreIndex.coerceAtLeast(0))
-                LazyRow(state = row, horizontalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(vertical = 4.dp, horizontal = 4.dp)) {
+                LazyRow(
+                    state = row,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    contentPadding = PaddingValues(top = 4.dp, bottom = 4.dp, start = 4.dp, end = ScreenGutter),
+                ) {
                     itemsIndexed(shelf.items, key = { _, it -> itemKey(it) }) { i, item ->
                         val focus = when {
                             si == restoreShelf && i == restoreIndex -> Modifier.focusRequester(restoreFocus)
@@ -263,19 +301,59 @@ private fun ShelvesTab(
     }
 }
 
+private val SizePattern = Regex("""^(\d+)(?:([.,])(\d+))?\s*(\S.*)$""")
+
+/**
+ * A tracker's size made short enough for a shelf card: whole units from 10 up ("19.98 GB" → "20 GB"),
+ * one decimal below ("8.73 GB" → "8.7 GB"). Anything it doesn't recognise comes back as it was.
+ */
+/** A tracker's size string in the UI language: "14.29 GB" → "14,29 ГБ" in Russian (design review R19). */
+internal fun localSize(size: String, language: String): String {
+    if (language != "ru") return size
+    val m = Regex("""^(\d+)(?:[.,](\d+))?\s*(TB|GB|MB|KB|B)$""", RegexOption.IGNORE_CASE).matchEntire(size.trim()) ?: return size
+    val (whole, fraction, unit) = m.destructured
+    val ru = mapOf("TB" to "ТБ", "GB" to "ГБ", "MB" to "МБ", "KB" to "КБ", "B" to "Б")[unit.uppercase()] ?: unit
+    return if (fraction.isEmpty()) "$whole $ru" else "$whole,$fraction $ru"
+}
+
+@Composable
+internal fun trackerSize(size: String): String =
+    localSize(size, androidx.compose.ui.platform.LocalConfiguration.current.locales[0].language)
+
+internal fun shortSize(size: String): String {
+    val m = SizePattern.matchEntire(size.trim()) ?: return size
+    val (whole, separator, fraction, unit) = m.destructured
+    val value = "$whole.${fraction.ifEmpty { "0" }}".toDoubleOrNull() ?: return size
+    val tenths = Math.round(value * 10)
+    return if (tenths >= 100 || tenths % 10 == 0L) {
+        "${Math.round(value)} $unit"
+    } else {
+        "${tenths / 10}${separator.ifEmpty { "." }}${tenths % 10} $unit"
+    }
+}
+
 @Composable
 private fun ShelfCard(item: TorrentItem, poster: String?, modifier: Modifier, onAsk: () -> Unit, onClick: () -> Unit) {
     LaunchedEffect(item.link) { onAsk() }
     TvCard(onClick, modifier.width(168.dp)) {
         val title = shortTitle(item.title)
         PosterImage(poster, title, 30.sp, Modifier.fillMaxWidth().height(74.dp))
-        Column(Modifier.padding(horizontal = 10.dp, vertical = 8.dp)) {
-            Text(title, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Palette.Text, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Spacer(Modifier.height(3.dp))
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+        Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+            Text(title, fontSize = Type.Caption, fontWeight = FontWeight.SemiBold, color = Palette.Text, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Spacer(Modifier.height(4.dp))
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 qualityOf(item.title)?.let { (q, c) -> Tag(q, c) }
-                Text("${item.seeds}", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = seedColor(item.seeds))
-                Text("· ${item.size}", fontSize = 10.sp, color = Palette.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(trackerSize(shortSize(item.size)), fontSize = Type.Caption, color = Palette.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+            Spacer(Modifier.height(4.dp))
+            // seeds labelled like on the search results, in the torrent's health colour
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.size(8.dp).background(seedColor(item.seeds), CircleShape))
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    pluralStringResource(R.plurals.seeds_count, item.seeds, item.seeds),
+                    fontSize = Type.Caption, fontWeight = FontWeight.SemiBold, color = seedColor(item.seeds), maxLines = 1,
+                )
             }
         }
     }

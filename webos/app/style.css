@@ -63,7 +63,7 @@ body.playing #backdrop, body.playing #shade { display: none; }
 .screen.active { display: flex; }
 
 .topbar { display: flex; align-items: center; height: 72px; }
-.logo { height: 72px; margin-left: -37px; }
+.logo { height: 72px; }
 .dot { width: 12px; height: 12px; border-radius: 50%; background: var(--muted); margin-right: 12px; flex: none; }
 .dot.ok { background: var(--good); }
 .dot.bad { background: var(--accent); }

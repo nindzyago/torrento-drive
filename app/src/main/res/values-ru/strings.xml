@@ -24,10 +24,10 @@
     <string name="trackers">Трекеры</string>
     <string name="home_title">Что смотрим сегодня?</string>
     <string name="speak">Сказать</string>
-    <string name="recent_typed">Набирал</string>
-    <string name="recent_spoken">Говорил</string>
+    <string name="recent_typed">Набрано</string>
+    <string name="recent_spoken">Сказано</string>
     <string name="continue_watching">Продолжить просмотр</string>
-    <string name="history_empty">Здесь появится то, что ты смотрел</string>
+    <string name="history_empty">Здесь появится всё, что ты смотришь</string>
     <string name="tracker_connected">Подключён · вход на сайте трекера</string>
     <string name="tracker_not_connected">Не подключён · вход на сайте трекера</string>
     <string name="tracker_no_login">Вход не нужен</string>
@@ -36,19 +36,32 @@
     <string name="add_tracker">Добавить трекер</string>
     <string name="add_tracker_hint">Нет нужного трекера? Добавить его — один файл, см. CONTRIBUTING.md</string>
     <string name="searching">ищу…</string>
+    <string name="searching_trackers">Ищу на %s…</string>
     <string name="nothing_found">ничего не нашлось</string>
     <string name="all_count">Все · %d</string>
-    <string name="seeds_label">сидов</string>
+    <plurals name="seeds_label">
+        <item quantity="one">сид</item>
+        <item quantity="few">сида</item>
+        <item quantity="many">сидов</item>
+        <item quantity="other">сида</item>
+    </plurals>
     <string name="peers_label">пиров</string>
     <string name="speed_label">скорость</string>
-    <string name="seeds_dot">● %d сидов</string>
+    <plurals name="seeds_dot">
+        <item quantity="one">● %d сид</item>
+        <item quantity="few">● %d сида</item>
+        <item quantity="many">● %d сидов</item>
+        <item quantity="other">● %d сида</item>
+    </plurals>
     <string name="open_failed">Не получилось открыть: %s</string>
     <string name="waiting_files">Открываю раздачу, жду список файлов…</string>
     <string name="no_video">В раздаче нет видеофайлов</string>
+    <string name="release_server_start">Открой TorrServe и нажми «Ещё раз».</string>
+    <string name="release_server_install">TorrServe не установлен. Установи его, запусти сервер и нажми «Ещё раз».</string>
     <string name="episodes">Серии</string>
     <string name="file">Файл</string>
     <string name="continue_n">Продолжить: %d</string>
-    <string name="watched_last">смотрел последним</string>
+    <string name="watched_last">последнее</string>
     <string name="watched">✓ просмотрено</string>
     <string name="preparing">Готовлю к просмотру</string>
     <string name="buffer_of">%1$s из %2$s</string>
@@ -97,7 +110,7 @@
     <string name="player_episode_of">Серия %1$d из %2$d</string>
     <string name="player_prev">Предыдущая</string>
     <string name="player_next">Следующая</string>
-    <string name="player_play">Играть</string>
+    <string name="player_play">Смотреть</string>
     <string name="player_pause">Пауза</string>
     <string name="player_resumed">Продолжили с %s</string>
     <string name="player_from_start">С начала</string>
@@ -151,6 +164,12 @@
         <item quantity="many">%d раздач</item>
         <item quantity="other">%d раздачи</item>
     </plurals>
+    <plurals name="seeds_count">
+        <item quantity="one">%d сид</item>
+        <item quantity="few">%d сида</item>
+        <item quantity="many">%d сидов</item>
+        <item quantity="other">%d сида</item>
+    </plurals>
     <plurals name="files_count">
         <item quantity="one">%d файл</item>
         <item quantity="few">%d файла</item>
@@ -178,8 +197,20 @@
     <string name="fact_video">Видео</string>
     <string name="fact_audio">Аудио</string>
     <string name="fact_subtitles">Субтитры</string>
-    <string name="seeds_peers">%1$d сидов · %2$d пиров</string>
+    <string name="seeds_peers">%1$s · %2$s</string>
+    <plurals name="peers_count">
+        <item quantity="one">%d пир</item>
+        <item quantity="few">%d пира</item>
+        <item quantity="many">%d пиров</item>
+        <item quantity="other">%d пира</item>
+    </plurals>
     <string name="added_on">добавлена %s</string>
-    <string name="live_peers">%1$d подключений · %2$s</string>
+    <string name="live_peers">%1$s · %2$s</string>
+    <plurals name="connections_count">
+        <item quantity="one">%d подключение</item>
+        <item quantity="few">%d подключения</item>
+        <item quantity="many">%d подключений</item>
+        <item quantity="other">%d подключения</item>
+    </plurals>
     <string name="more">ещё</string>
 </resources>
