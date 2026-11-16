@@ -37,6 +37,7 @@
     <string name="add_tracker">Add a tracker</string>
     <string name="add_tracker_hint">Missing your tracker? Adding one is a single file — see CONTRIBUTING.md</string>
     <string name="searching">searching…</string>
+    <string name="searching_trackers">Searching %s…</string>
     <string name="nothing_found">nothing found</string>
     <string name="all_count">All · %d</string>
     <string name="seeds_label">seeds</string>
