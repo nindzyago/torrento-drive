@@ -14,7 +14,22 @@ object Trackers {
         RutrackerProvider(rutracker),
         RutorProvider(),
     )
+
+    /**
+     * Which trackers a search asks: the ones switched on, except those that need a sign-in that isn't there.
+     * Those are skipped without a single request (for RuTracker a request without a session can only bring up
+     * the Cloudflare check over the app and end in "sign-in required" anyway); the screen tells the user
+     * to sign in instead.
+     */
+    fun searchPlan(all: List<TrackerProvider>, isOn: (TrackerProvider) -> Boolean): SearchPlan {
+        val on = all.filter(isOn)
+        val (needSignIn, ask) = on.partition { it.requiresSignIn && !it.isSignedIn }
+        return SearchPlan(ask, needSignIn)
+    }
 }
+
+/** The trackers a search asks, and the switched-on ones it skips because they need a sign-in. */
+data class SearchPlan(val ask: List<TrackerProvider>, val needSignIn: List<TrackerProvider>)
 
 /** Trackers switched off in settings: they don't take part in searches. */
 class TrackerSwitches(context: Context) {

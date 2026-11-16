@@ -36,6 +36,7 @@
     <string name="add_tracker">Добавить трекер</string>
     <string name="add_tracker_hint">Нет нужного трекера? Добавить его — один файл, см. CONTRIBUTING.md</string>
     <string name="searching">ищу…</string>
+    <string name="searching_trackers">Ищу на %s…</string>
     <string name="nothing_found">ничего не нашлось</string>
     <string name="all_count">Все · %d</string>
     <string name="seeds_label">сидов</string>

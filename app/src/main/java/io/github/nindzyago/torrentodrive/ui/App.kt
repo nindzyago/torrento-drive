@@ -47,10 +47,18 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.focus.focusProperties
+import androidx.compose.foundation.focusGroup
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.draw.clip
 import io.github.nindzyago.torrentodrive.QuerySource
 import io.github.nindzyago.torrentodrive.SearchHistory
@@ -109,6 +117,8 @@ private sealed interface Screen {
         val items: List<TorrentItem>? = null,
         /** Errors from individual trackers: the remaining results are still shown. */
         val notes: List<String> = emptyList(),
+        /** Names of the trackers being asked, for the loading state. */
+        val searching: List<String> = emptyList(),
     ) : Screen
     data class Files(
         /** Where we came from: search results, or (null) the home screen's "Continue watching". */
@@ -169,15 +179,18 @@ fun App(
         val query = SearchQuery.parse(phrase)
         if (query.text.isBlank()) return
         searches.add(source, phrase)
-        val results = Screen.Results(query)
+        // trackers that need a sign-in that isn't there are not asked at all, only noted
+        val plan = Trackers.searchPlan(trackers, switches::isOn)
+        val signInNotes = plan.needSignIn.map { context.getString(R.string.login_required, it.name) }
+        val results = Screen.Results(query, notes = signInNotes, searching = plan.ask.map { it.name })
         screen = results
         scope.launch {
             Connection.awaitReady()
             val found = coroutineScope {
-                trackers.filter(switches::isOn).map { t -> async { t.name to runCatching { t.search(query.text) } } }.awaitAll()
+                plan.ask.map { t -> async { t.name to runCatching { t.search(query.text) } } }.awaitAll()
             }
             val items = found.flatMap { it.second.getOrDefault(emptyList()) }
-            val notes = found.mapNotNull { (name, r) ->
+            val notes = signInNotes + found.mapNotNull { (name, r) ->
                 r.exceptionOrNull()?.let { e ->
                     if (e is LoginRequired) context.getString(R.string.login_required, name)
                     else context.getString(R.string.tracker_error, name, e.message ?: e.toString())
@@ -671,6 +684,7 @@ internal fun qualityOf(title: String): Pair<String, Color>? = when {
     else -> null
 }
 
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 private fun ResultsScreen(s: Screen.Results, onOpen: (TorrentItem) -> Unit) {
     val items = s.items.orEmpty()
@@ -685,6 +699,7 @@ private fun ResultsScreen(s: Screen.Results, onOpen: (TorrentItem) -> Unit) {
             Spacer(Modifier.width(12.dp))
             Text(
                 when {
+                    s.items == null && s.searching.isNotEmpty() -> stringResource(R.string.searching_trackers, s.searching.joinToString(", "))
                     s.items == null -> stringResource(R.string.searching)
                     items.isEmpty() -> stringResource(R.string.nothing_found)
                     else -> pluralStringResource(R.plurals.results_count, items.size, items.size) + " · $trackers"
@@ -695,24 +710,87 @@ private fun ResultsScreen(s: Screen.Results, onOpen: (TorrentItem) -> Unit) {
             )
         }
         s.notes.forEach { Text(it, fontSize = Type.Caption, color = Palette.Warn) }
-        if (counts.size > 1) {
+        // one requester per chip: Up from the list lands on the selected chip, not the geometrically nearest one
+        val allChip = remember(s.items) { FocusRequester() }
+        val chipFocus = remember(s.items) { counts.associate { it.first to FocusRequester() } }
+        val selectedChip = category?.let { chipFocus[it] } ?: allChip
+        val hasChips = counts.size > 1
+        if (hasChips) {
             Spacer(Modifier.height(12.dp))
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), contentPadding = PaddingValues(horizontal = 2.dp, vertical = 2.dp)) {
-                item { TvButton(stringResource(R.string.all_count, items.size), { category = null }, selected = category == null) }
-                items(counts, key = { it.first.name }) { (c, n) ->
-                    TvButton("${stringResource(c.label)} · $n", { category = c }, selected = category == c)
+            // moving along the chips only moves focus; the filter changes on OK, and the selected chip keeps its look
+            Row(
+                Modifier
+                    .focusProperties { enter = { selectedChip } }
+                    .focusGroup()
+                    .horizontalScroll(rememberScrollState())
+                    .padding(2.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                TvButton(stringResource(R.string.all_count, items.size), { category = null }, Modifier.focusRequester(allChip), selected = category == null)
+                counts.forEach { (c, n) ->
+                    TvButton("${stringResource(c.label)} · $n", { category = c }, Modifier.focusRequester(chipFocus.getValue(c)), selected = category == c)
                 }
             }
         }
         Spacer(Modifier.height(12.dp))
         val firstFocus = remember { FocusRequester() }
         LaunchedEffect(s.items) { if (items.isNotEmpty()) runCatching { firstFocus.requestFocus() } }
-        LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp), contentPadding = PaddingValues(vertical = 6.dp, horizontal = 4.dp)) {
+        if (s.items == null) {
+            SearchingPlaceholders()
+            return@Column
+        }
+        LazyColumn(
+            Modifier
+                .focusProperties { exit = { if (it == FocusDirection.Up && hasChips) selectedChip else FocusRequester.Default } }
+                .focusGroup(),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            contentPadding = PaddingValues(vertical = 6.dp, horizontal = 4.dp),
+        ) {
             items(shown, key = { "${it.trackerId}:${it.link}" }) { item ->
                 ResultCard(item, onClick = { onOpen(item) }, modifier = if (item === shown.first()) Modifier.focusRequester(firstFocus) else Modifier)
             }
         }
     }
+}
+
+/**
+ * The results screen while trackers are being asked: rows the shape of [ResultCard], so the screen looks like what
+ * is coming, and the first one takes focus so the remote has somewhere to be. OK on them does nothing.
+ */
+@Composable
+private fun SearchingPlaceholders() {
+    val first = remember { FocusRequester() }
+    LaunchedEffect(Unit) { runCatching { first.requestFocus() } }
+    val description = stringResource(R.string.searching)
+    Column(Modifier.padding(vertical = 6.dp, horizontal = 4.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        listOf(0.72f, 0.56f, 0.64f, 0.48f, 0.6f).forEachIndexed { i, width ->
+            TvCard(
+                onClick = {},
+                modifier = (if (i == 0) Modifier.focusRequester(first) else Modifier)
+                    .fillMaxWidth()
+                    .semantics { contentDescription = description },
+            ) {
+                Row(Modifier.padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        PlaceholderBar(Modifier.fillMaxWidth(width).height(16.dp))
+                        Spacer(Modifier.height(8.dp))
+                        PlaceholderBar(Modifier.width(160.dp).height(12.dp))
+                    }
+                    Spacer(Modifier.width(20.dp))
+                    Column(horizontalAlignment = Alignment.End) {
+                        PlaceholderBar(Modifier.width(32.dp).height(20.dp))
+                        Spacer(Modifier.height(4.dp))
+                        PlaceholderBar(Modifier.width(40.dp).height(12.dp))
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PlaceholderBar(modifier: Modifier) {
+    Box(modifier.background(Palette.Glass, Radius.S))
 }
 
 @Composable
