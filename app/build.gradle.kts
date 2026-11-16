@@ -16,8 +16,8 @@ android {
         applicationId = "io.github.nindzyago.torrentodrive"
         minSdk = 28
         targetSdk = 36
-        versionCode = 11
-        versionName = "0.6.0"
+        versionCode = 12
+        versionName = "0.6.1"
     }
 
     // Release key: from environment variables (CI) or keystore.properties (your machine, git-ignored).
@@ -74,4 +74,6 @@ dependencies {
     implementation("androidx.media3:media3-ui:1.11.1")
 
     testImplementation("junit:junit:4.13.2")
+    // android.jar has org.json only as stubs; unit tests need the real thing
+    testImplementation("org.json:json:20250517")
 }

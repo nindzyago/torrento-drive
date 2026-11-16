@@ -20,3 +20,16 @@ object Direct : ConnectionMethod {
     override val description = R.string.connection_direct_hint
     override suspend fun start(context: Context) = null
 }
+
+/**
+ * ByeDPI: changes how the start of each connection is sent (splits it, reorders the pieces…), so that network
+ * filters don't recognize the site while the site itself receives everything as usual.
+ * Runs inside the app, without a VPN; see [ByeDpi].
+ */
+object ByeDpiMethod : ConnectionMethod {
+    override val id = "byedpi"
+    override val title = R.string.connection_byedpi
+    override val description = R.string.connection_byedpi_hint
+    override val badge = "byedpi ${ByeDpi.VERSION}"
+    override suspend fun start(context: Context) = ByeDpi.start()
+}
