@@ -69,7 +69,7 @@ object Connection {
             for (method in candidates) {
                 val proxy = runCatching { method.start(context) }.getOrElse { continue }
                 val missing = trackers.filter { result[it.id]?.method == null }
-                val found = probe(missing, proxy)
+                val found = probe(missing, proxy, if (proxy == null) DIRECT_TIMEOUT else PROXY_TIMEOUT)
                 missing.forEach { t -> result[t.id] = found[t.id]?.let { Reach(method, it) } ?: Reach(null) }
                 if (found.isNotEmpty() || use == null) use = method to proxy
                 if (result.values.all { it.method != null }) break
@@ -84,14 +84,20 @@ object Connection {
         }
     }
 
+    /** Runs [Diagnostics], then checks again: the diagnostics restarts byedpi, so nothing else may use it meanwhile. */
+    suspend fun diagnose(context: Context, trackers: List<TrackerProvider>) {
+        mutex.withLock { Diagnostics.run(context, trackers) }
+        check(context, trackers)
+    }
+
     /** Waits while a check is running, so a search right after start-up already goes the right way. */
     suspend fun awaitReady() {
-        withTimeoutOrNull(20_000) { while (checking.value || active.value == null) delay(100) }
+        withTimeoutOrNull(25_000) { while (checking.value || active.value == null) delay(100) }
     }
 
     /** Which trackers answer through [proxy], with the time to the first response. */
-    private suspend fun probe(trackers: List<TrackerProvider>, proxy: InetSocketAddress?): Map<String, Long> = coroutineScope {
-        val client = Http.trackersClient(proxy).newBuilder().callTimeout(PROBE_TIMEOUT, TimeUnit.MILLISECONDS).build()
+    private suspend fun probe(trackers: List<TrackerProvider>, proxy: InetSocketAddress?, timeout: Long): Map<String, Long> = coroutineScope {
+        val client = Http.trackersClient(proxy).newBuilder().callTimeout(timeout, TimeUnit.MILLISECONDS).build()
         trackers.map { t ->
             async(Dispatchers.IO) {
                 val start = System.currentTimeMillis()
@@ -117,5 +123,8 @@ object Connection {
     private fun prefs(context: Context) = context.getSharedPreferences("connection", Context.MODE_PRIVATE)
 
     private const val KEY = "method"
-    private const val PROBE_TIMEOUT = 8_000L
+    private const val DIRECT_TIMEOUT = 6_000L
+
+    /** Long enough for a method to go through all of its own fallbacks (byedpi: four strategies, 2 s each). */
+    private const val PROXY_TIMEOUT = 12_000L
 }

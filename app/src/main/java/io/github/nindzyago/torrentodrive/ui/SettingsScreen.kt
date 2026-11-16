@@ -40,16 +40,21 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.tv.material3.Border
 import androidx.tv.material3.ClickableSurfaceDefaults
 import androidx.tv.material3.Surface
 import androidx.tv.material3.Text
 import io.github.nindzyago.torrentodrive.ApkInstaller
 import io.github.nindzyago.torrentodrive.R
+import io.github.nindzyago.torrentodrive.connection.ByeDpi
 import io.github.nindzyago.torrentodrive.connection.Connection
+import io.github.nindzyago.torrentodrive.connection.Diagnostics
 import io.github.nindzyago.torrentodrive.connection.ConnectionMethods
 import io.github.nindzyago.torrentodrive.lang.AppLanguage
 import io.github.nindzyago.torrentodrive.lang.LanguageWords
@@ -204,6 +209,8 @@ private fun ConnectionSection(trackers: List<TrackerProvider>) {
     val chosen by Connection.chosen
     val active by Connection.active
     val checking by Connection.checking
+    val diagnosing by Diagnostics.running
+    var showDiagnostics by remember { mutableStateOf(false) }
     fun choose(id: String) = scope.launch { Connection.choose(context, id, trackers) }
 
     SectionHeader(stringResource(R.string.connection_title), stringResource(R.string.connection_subtitle))
@@ -225,10 +232,76 @@ private fun ConnectionSection(trackers: List<TrackerProvider>) {
             }
             Text(caption.uppercase(), fontSize = Type.Caption, fontWeight = FontWeight.Medium, color = Palette.Muted, letterSpacing = 1.sp)
             Spacer(Modifier.weight(1f))
-            TvButton(stringResource(R.string.connection_check_again), { if (!checking) scope.launch { Connection.check(context, trackers) } })
+            TvButton(stringResource(R.string.diagnostics), {
+                if (!checking && !diagnosing) {
+                    showDiagnostics = true
+                    scope.launch { Connection.diagnose(context, trackers) }
+                }
+            })
+            Spacer(Modifier.width(8.dp))
+            TvButton(stringResource(R.string.connection_check_again), { if (!checking && !diagnosing) scope.launch { Connection.check(context, trackers) } })
         }
         trackers.forEach { t -> ReachLine(t) }
     }
+    if (showDiagnostics) DiagnosticsDialog { showDiagnostics = false }
+}
+
+/**
+ * The connection diagnostics, full screen so that one photo of the TV holds the whole report:
+ * a column per tracker, a line per step.
+ */
+@Composable
+private fun DiagnosticsDialog(onClose: () -> Unit) {
+    val context = LocalContext.current
+    val running by Diagnostics.running
+    val progress by Diagnostics.progress
+    val report by Diagnostics.report
+    val close = remember { FocusRequester() }
+    val header = remember {
+        val version = context.packageManager.getPackageInfo(context.packageName, 0).versionName.orEmpty()
+        "Torrento Drive $version · byedpi ${ByeDpi.VERSION} · " +
+            java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.US).format(java.util.Date())
+    }
+    Dialog(onClose, DialogProperties(usePlatformDefaultWidth = false)) {
+        Column(Modifier.fillMaxSize().background(Palette.Bg).padding(horizontal = 40.dp, vertical = 24.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(stringResource(R.string.diagnostics_title), fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Palette.Text)
+                    Text(header, fontSize = 11.sp, color = Palette.Muted)
+                }
+                TvButton(stringResource(R.string.diagnostics_close), onClose, Modifier.focusRequester(close))
+            }
+            Spacer(Modifier.height(6.dp))
+            Text(
+                if (running) progress else stringResource(R.string.diagnostics_hint),
+                fontSize = 12.sp, color = if (running) Palette.AccentSoft else Palette.Muted,
+            )
+            Spacer(Modifier.height(12.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(28.dp)) {
+                report.orEmpty().forEach { tracker ->
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                        Text("${tracker.name} · ${tracker.host}", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = Palette.Text)
+                        tracker.lines.forEach { line ->
+                            Row {
+                                val dot = when (line.ok) {
+                                    true -> Palette.Good
+                                    false -> Palette.Accent
+                                    null -> Palette.Muted
+                                }
+                                Box(Modifier.padding(top = 5.dp).size(7.dp).background(dot, CircleShape))
+                                Spacer(Modifier.width(9.dp))
+                                Column {
+                                    Text(line.label, fontSize = 10.sp, color = Palette.Muted, fontFamily = FontFamily.Monospace, lineHeight = 13.sp, maxLines = 1)
+                                    Text(line.text, fontSize = 12.sp, color = Palette.Text, lineHeight = 15.sp, maxLines = 2)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    LaunchedEffect(Unit) { runCatching { close.requestFocus() } }
 }
 
 /** One tracker's line from the last connection check: a colored dot, the name, how it opens. */

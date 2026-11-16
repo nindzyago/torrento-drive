@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.6.1
+
+- ByeDPI: when the network drops packets silently instead of resetting the connection, every
+  strategy now gets its turn within one connection check. Before, a check tried only the first
+  one and reported the tracker as unreachable.
+- Settings → Connection → Diagnostics: a one-screen report of what stands between the app and each
+  tracker (the provider's DNS against an independent one, a direct connection, and every ByeDPI
+  strategy on its own), made to be photographed and sent to the developer.
+
 ## 0.6.0
 
 - New look for the name: Torrento is becoming a family of apps (Drive, then Play, Music…), and
