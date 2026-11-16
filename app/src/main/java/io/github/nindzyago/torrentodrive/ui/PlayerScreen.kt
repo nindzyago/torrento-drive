@@ -61,6 +61,7 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import androidx.tv.material3.Text
 import io.github.nindzyago.torrentodrive.Progress
+import io.github.nindzyago.torrentodrive.ExternalPlayer
 import io.github.nindzyago.torrentodrive.R
 import io.github.nindzyago.torrentodrive.torrserver.TorrentFile
 import io.github.nindzyago.torrentodrive.torrserver.TorrentStats
@@ -95,6 +96,8 @@ internal fun PlayerScreen(
     onExit: () -> Unit,
 ) {
     val context = LocalContext.current
+    /** Another app can play the stream: without one, "Other player" would only end in a system error. */
+    val hasExternal = remember { ExternalPlayer.available(context) }
     val player = remember { ExoPlayer.Builder(context).setSeekBackIncrementMs(SEEK_STEP_MS).setSeekForwardIncrementMs(SEEK_STEP_MS).build() }
 
     var file by remember { mutableStateOf(start) }
@@ -323,7 +326,7 @@ internal fun PlayerScreen(
                 onFromStart = { player.seekTo(0); resumedFrom = null },
                 onAudio = { cycleTrack(player, tracks, C.TRACK_TYPE_AUDIO, allowOff = false) },
                 onSubtitles = { cycleTrack(player, tracks, C.TRACK_TYPE_TEXT, allowOff = true) },
-                onExternal = { save(); onExternal(file) },
+                onExternal = if (hasExternal) { { save(); onExternal(file) } } else null,
             )
         }
 
@@ -340,7 +343,15 @@ internal fun PlayerScreen(
         }
 
         error?.let { msg ->
-            ErrorPanel(msg, errorFocus, onExternal = { save(); onExternal(file) }, onBack = onExit, modifier = Modifier.align(Alignment.Center))
+            ErrorPanel(
+                msg,
+                errorFocus,
+                onExternal = if (hasExternal) { { save(); onExternal(file) } } else null,
+                // after an error the player is idle; prepare() tries the same file again from where it stopped
+                onRetry = { save(); error = null; player.prepare(); player.play() },
+                onBack = onExit,
+                modifier = Modifier.align(Alignment.Center),
+            )
         }
     }
 }
@@ -367,7 +378,8 @@ private fun Overlay(
     onFromStart: () -> Unit,
     onAudio: () -> Unit,
     onSubtitles: () -> Unit,
-    onExternal: () -> Unit,
+    /** Null when no other app can play video: the button is not shown. */
+    onExternal: (() -> Unit)?,
 ) {
     Box(Modifier.fillMaxSize()) {
         // top: what is playing
@@ -420,7 +432,7 @@ private fun Overlay(
                 if (subs.isNotEmpty()) {
                     TvButton(stringResource(R.string.player_subs, subs.firstOrNull { it.selected }?.label ?: stringResource(R.string.player_off)), onSubtitles)
                 }
-                TvButton(stringResource(R.string.player_external), onExternal)
+                if (onExternal != null) TvButton(stringResource(R.string.player_external), onExternal)
             }
         }
     }
@@ -511,7 +523,14 @@ private fun BufferingBadge(stats: TorrentStats?, modifier: Modifier = Modifier) 
 }
 
 @Composable
-private fun ErrorPanel(message: String, focus: FocusRequester, onExternal: () -> Unit, onBack: () -> Unit, modifier: Modifier = Modifier) {
+private fun ErrorPanel(
+    message: String,
+    focus: FocusRequester,
+    onExternal: (() -> Unit)?,
+    onRetry: () -> Unit,
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     Column(
         modifier
             .width(520.dp)
@@ -521,7 +540,12 @@ private fun ErrorPanel(message: String, focus: FocusRequester, onExternal: () ->
         Text(stringResource(R.string.player_error, message), fontSize = Type.Body, color = Palette.Text)
         Spacer(Modifier.height(16.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            TvButton(stringResource(R.string.player_external), onExternal, Modifier.focusRequester(focus), primary = true)
+            // the recommended way out goes first and takes focus: another player if there is one, otherwise try again
+            if (onExternal != null) {
+                TvButton(stringResource(R.string.player_external), onExternal, Modifier.focusRequester(focus), primary = true)
+            } else {
+                TvButton(stringResource(R.string.try_again), onRetry, Modifier.focusRequester(focus), primary = true)
+            }
             TvButton(stringResource(R.string.player_back), onBack)
         }
     }

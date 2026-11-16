@@ -117,6 +117,8 @@ private sealed interface Screen {
         val hash: String? = null,
         val files: List<TorrentFile>? = null,
         val error: String? = null,
+        /** The [error] is TorrServer not answering: offer to start or install TorrServe. */
+        val serverDown: Boolean = false,
         val stats: TorrentStats? = null,
         /** Poster from the torrent description. */
         val poster: String? = null,
@@ -229,9 +231,9 @@ fun App(
         }
     }
 
-    /** Opens a torrent; [resumeIndex] starts that file right away (resuming from history). */
-    fun open(from: Screen.Results?, item: TorrentItem, resumeIndex: Int? = null) {
-        var files = Screen.Files(from, item)
+    /** Opens a torrent; [resumeIndex] starts that file right away (resuming from history); [retry] keeps its poster and details. */
+    fun open(from: Screen.Results?, item: TorrentItem, resumeIndex: Int? = null, retry: Screen.Files? = null) {
+        var files = Screen.Files(from, item, poster = retry?.poster, details = retry?.details)
         screen = files
         fun update(next: Screen.Files) {
             if ((screen as? Screen.Files)?.item == item) screen = next
@@ -260,7 +262,9 @@ fun App(
                 // only "Continue watching" starts by itself; anything else waits on the Watch button
                 if (resumed != null && (screen as? Screen.Files)?.item == item) load(files, resumed)
             } catch (e: Exception) {
-                update(files.copy(error = e.message ?: e.toString()))
+                // a tracker that can't be reached is only TorrServer's fault if TorrServer is silent too
+                val serverDown = TorrServerClient.isUnreachable(e) || !server.isAlive()
+                update(files.copy(error = e.message ?: e.toString(), serverDown = serverDown))
             }
         }
     }
@@ -423,10 +427,12 @@ fun App(
                     )
                     is Screen.Results -> ResultsScreen(s, onOpen = { open(s, it) })
                     is Screen.Files -> ReleaseScreen(
-                        Release(s.item, s.poster, s.details, s.files, s.error, s.stats),
+                        Release(s.item, s.poster, s.details, s.files, s.error, s.stats, s.serverDown),
                         watched = history.entries.firstOrNull { it.item.trackerId == s.item.trackerId && it.item.link == s.item.link },
                         progressOf = { progress.get(s.item, it.index) },
                         onPlay = { file -> load(s, file) },
+                        onRetry = { open(s.from, s.item, retry = s) },
+                        onBack = { screen = s.from ?: Screen.Home },
                     )
                     is Screen.Loading -> LoadingScreen(s, onPlayNow = { startPlayback(s.from, s.file) })
                     is Screen.Player -> Unit

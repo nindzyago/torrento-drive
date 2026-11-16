@@ -1,6 +1,9 @@
 package io.github.nindzyago.torrentodrive.ui
 
+import android.content.Intent
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -63,6 +66,8 @@ internal class Release(
     val files: List<TorrentFile>?,
     val error: String?,
     val stats: TorrentStats?,
+    /** The [error] is TorrServer not answering. */
+    val serverDown: Boolean = false,
 )
 
 /**
@@ -71,13 +76,37 @@ internal class Release(
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-internal fun ReleaseScreen(r: Release, watched: WatchEntry?, progressOf: (TorrentFile) -> Progress?, onPlay: (TorrentFile) -> Unit) {
+internal fun ReleaseScreen(
+    r: Release,
+    watched: WatchEntry?,
+    progressOf: (TorrentFile) -> Progress?,
+    onPlay: (TorrentFile) -> Unit,
+    onRetry: () -> Unit,
+    onBack: () -> Unit,
+) {
     val d = r.details
     val title = d?.facts?.get(Fact.Title) ?: shortTitle(r.item.title)
     val files = r.files
     val watchFocus = remember { FocusRequester() }
     val list = rememberLazyListState()
-    LaunchedEffect(Unit) {
+    val context = LocalContext.current
+    var torrServe by remember { mutableStateOf(torrServeLaunch(context)) }
+    // notice TorrServe being installed while the panel is on screen
+    LaunchedEffect(r.serverDown, torrServe == null) {
+        while (r.serverDown && torrServe == null) {
+            kotlinx.coroutines.delay(2000)
+            torrServe = torrServeLaunch(context)
+        }
+    }
+    // whatever stands in the Watch button's place (an error panel, Try again, Back) takes the focus over
+    val state = when {
+        r.error != null && r.serverDown -> if (torrServe != null) "open-torrserve" else "install-torrserve"
+        r.error != null -> "error"
+        files != null && files.isEmpty() -> "no-video"
+        else -> "watch"
+    }
+    LaunchedEffect(state) {
+        kotlinx.coroutines.delay(50) // let the new button compose first
         runCatching { watchFocus.requestFocus() }
         // focusing the button scrolls it into view a frame later; then bring the title back on screen
         kotlinx.coroutines.delay(150)
@@ -139,7 +168,7 @@ internal fun ReleaseScreen(r: Release, watched: WatchEntry?, progressOf: (Torren
             item(key = "watch") {
                 Column {
                     Spacer(Modifier.height(8.dp))
-                    WatchRow(r, watched, progressOf, onPlay, watchFocus)
+                    WatchRow(r, watched, progressOf, onPlay, onRetry, onBack, torrServe, watchFocus)
                 }
             }
             if (files != null && files.isNotEmpty()) {
@@ -174,14 +203,37 @@ internal fun ReleaseScreen(r: Release, watched: WatchEntry?, progressOf: (Torren
 
 /** The Watch button: continue where it was left, start from episode 1, or (still opening) wait. */
 @Composable
-private fun WatchRow(r: Release, watched: WatchEntry?, progressOf: (TorrentFile) -> Progress?, onPlay: (TorrentFile) -> Unit, focus: FocusRequester) {
+private fun WatchRow(
+    r: Release,
+    watched: WatchEntry?,
+    progressOf: (TorrentFile) -> Progress?,
+    onPlay: (TorrentFile) -> Unit,
+    onRetry: () -> Unit,
+    onBack: () -> Unit,
+    torrServe: Intent?,
+    focus: FocusRequester,
+) {
     val files = r.files
+    if (r.error != null && r.serverDown) {
+        ServerDownPanel(r.error, torrServe, onRetry, focus)
+        return
+    }
+    // every dead end keeps a button, so focus always has somewhere to be
     if (r.error != null) {
-        Text(stringResource(R.string.open_failed, r.error), color = Palette.Accent, fontSize = Type.Caption)
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(stringResource(R.string.open_failed, r.error), color = Palette.Accent, fontSize = Type.Caption, lineHeight = Type.CaptionLine)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                TvButton(stringResource(R.string.try_again), onRetry, Modifier.focusRequester(focus), primary = true, large = true)
+                TvButton(stringResource(R.string.player_back), onBack, large = true)
+            }
+        }
         return
     }
     if (files != null && files.isEmpty()) {
-        Text(stringResource(R.string.no_video), color = Palette.Accent, fontSize = Type.Caption)
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(stringResource(R.string.no_video), color = Palette.Accent, fontSize = Type.Caption)
+            TvButton(stringResource(R.string.player_back), onBack, Modifier.focusRequester(focus), primary = true, large = true)
+        }
         return
     }
     val lastIdx = files?.indexOfFirst { it.index == watched?.fileIndex } ?: -1
@@ -199,6 +251,43 @@ private fun WatchRow(r: Release, watched: WatchEntry?, progressOf: (TorrentFile)
         // one button for every state, so focus stays on it when the file list arrives
         TvButton(label, { file?.let(onPlay) }, Modifier.focusRequester(focus), primary = true, large = true, icon = if (file != null) Icon.Play else null)
         if (files == null) r.stats?.let { Text(stringResource(R.string.live_peers, it.activePeers, formatSpeed(it.speedBytes)), fontSize = Type.Caption, color = Palette.Muted) }
+    }
+}
+
+/**
+ * In the Watch button's place while TorrServer doesn't answer: what is wrong, how to fix it, a button that opens
+ * (or installs) TorrServe and Try again; the raw error stays below as one small line.
+ */
+@Composable
+private fun ServerDownPanel(detail: String, torrServe: Intent?, onRetry: () -> Unit, focus: FocusRequester) {
+    val context = LocalContext.current
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(
+            Modifier
+                .background(Palette.Surface, Radius.L)
+                .border(1.dp, Palette.Line, Radius.L)
+                .padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Box(Modifier.size(8.dp).background(Palette.Accent, CircleShape))
+                Text(stringResource(R.string.server_down), fontSize = Type.Body, fontWeight = FontWeight.SemiBold, color = Palette.Text)
+            }
+            Text(
+                stringResource(if (torrServe != null) R.string.release_server_start else R.string.release_server_install),
+                fontSize = Type.Caption, lineHeight = Type.CaptionLine, color = Palette.Muted,
+            )
+            Spacer(Modifier.height(4.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (torrServe != null) {
+                    TvButton(stringResource(R.string.open_torrserve), { context.startActivity(torrServe) }, Modifier.focusRequester(focus), primary = true)
+                } else {
+                    InstallTorrServeButton(reinstall = false, modifier = Modifier.focusRequester(focus))
+                }
+                TvButton(stringResource(R.string.try_again), onRetry)
+            }
+        }
+        Text(detail, fontSize = Type.Caption, color = Palette.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 

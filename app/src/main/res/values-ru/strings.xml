@@ -45,6 +45,8 @@
     <string name="open_failed">Не получилось открыть: %s</string>
     <string name="waiting_files">Открываю раздачу, жду список файлов…</string>
     <string name="no_video">В раздаче нет видеофайлов</string>
+    <string name="release_server_start">Открой TorrServe и нажми «Ещё раз».</string>
+    <string name="release_server_install">TorrServe не установлен. Установи его, запусти сервер и нажми «Ещё раз».</string>
     <string name="episodes">Серии</string>
     <string name="file">Файл</string>
     <string name="continue_n">Продолжить: %d</string>

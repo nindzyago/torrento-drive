@@ -50,6 +50,20 @@ data class TorrentStats(
 /** Client for the HTTP API of TorrServer (MatriX) running on the TV box itself. */
 class TorrServerClient(private val baseUrl: String = "http://127.0.0.1:8090") {
 
+    companion object {
+        /**
+         * Whether [e] says nothing listens on TorrServer's address ([host]:[port]): connection refused or failed.
+         * Only failures naming that address count, so a tracker website that can't be reached is not mistaken for it.
+         */
+        fun isUnreachable(e: Throwable, host: String = "127.0.0.1", port: Int = 8090): Boolean =
+            generateSequence(e) { it.cause }.take(8).any { t ->
+                val msg = t.message.orEmpty()
+                val connectFailure = t is java.net.ConnectException || t is java.net.NoRouteToHostException ||
+                    msg.contains("failed to connect", ignoreCase = true) || msg.contains("connection refused", ignoreCase = true)
+                connectFailure && msg.contains(host) && msg.contains(port.toString())
+            }
+    }
+
     suspend fun isAlive(): Boolean = version() != null
 
     /** The server's version ("MatriX.147"), or null if it doesn't answer. */
