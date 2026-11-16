@@ -368,7 +368,7 @@ fun App(
                   is Screen.Loading -> PosterBackdrop(s.from.poster)
                   else -> Unit
               }
-              Box(Modifier.fillMaxSize().padding(horizontal = 42.dp, vertical = 27.dp)) {
+              Box(Modifier.fillMaxSize().padding(horizontal = 44.dp, vertical = 28.dp)) {
                 when (val s = screen) {
                     Screen.Home -> HomeScreen(
                         serverAlive = serverAlive,
@@ -442,16 +442,16 @@ fun App(
                         .fillMaxWidth()
                         .height(56.dp)
                         .background(Palette.Bg)
-                        .padding(horizontal = 21.dp),
+                        .padding(horizontal = 20.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     TvIcon(Icon.Lock, Palette.Good, 14.dp)
-                    Text("rutracker.org", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Palette.Text)
-                    Text(stringResource(R.string.login_bar_hint), fontSize = 11.sp, color = Palette.Muted)
+                    Text("rutracker.org", fontSize = Type.Caption, fontWeight = FontWeight.SemiBold, color = Palette.Text)
+                    Text(stringResource(R.string.login_bar_hint), fontSize = Type.Caption, color = Palette.Muted)
                     Spacer(Modifier.weight(1f))
                     listOf(stringResource(R.string.key_arrows), stringResource(R.string.key_ok), stringResource(R.string.key_back)).forEach {
-                        Text(it, fontSize = 10.sp, color = Palette.Muted, modifier = Modifier.border(1.dp, Palette.Line, RoundedCornerShape(5.dp)).padding(horizontal = 6.dp, vertical = 3.dp))
+                        Text(it, fontSize = Type.Caption, color = Palette.Muted, modifier = Modifier.border(1.dp, Palette.Line, Radius.S).padding(horizontal = 8.dp, vertical = 4.dp))
                     }
                 }
             }
@@ -462,7 +462,7 @@ fun App(
                 Text(
                     stringResource(R.string.challenge_hint, "RuTracker"),
                     color = Palette.Text,
-                    fontSize = 18.sp,
+                    fontSize = Type.Title,
                     modifier = Modifier
                         .zIndex(3f)
                         .align(Alignment.BottomCenter)
@@ -517,15 +517,15 @@ private fun HomeScreen(
                 false -> Palette.Accent to stringResource(R.string.server_down)
             }
             Box(Modifier.size(6.dp).background(dot, CircleShape))
-            Spacer(Modifier.width(6.dp))
-            Text(label, fontSize = 11.sp, color = Palette.Muted)
+            Spacer(Modifier.width(8.dp))
+            Text(label, fontSize = Type.Caption, color = Palette.Muted)
             if (unreachable.isNotEmpty()) {
                 Spacer(Modifier.width(16.dp))
                 Box(Modifier.size(6.dp).background(Palette.Warn, CircleShape))
-                Spacer(Modifier.width(6.dp))
-                Text(stringResource(R.string.trackers_unreachable, unreachable.joinToString(", ")), fontSize = 11.sp, color = Palette.Warn)
+                Spacer(Modifier.width(8.dp))
+                Text(stringResource(R.string.trackers_unreachable, unreachable.joinToString(", ")), fontSize = Type.Caption, color = Palette.Warn)
             }
-            Spacer(Modifier.width(18.dp))
+            Spacer(Modifier.width(20.dp))
             if (update != null) {
                 val label = when {
                     update.busy -> stringResource(R.string.update_downloading)
@@ -533,13 +533,13 @@ private fun HomeScreen(
                     else -> stringResource(R.string.update_available, update.update.version)
                 }
                 TvButton(label, onUpdate, icon = Icon.Download)
-                Spacer(Modifier.width(10.dp))
+                Spacer(Modifier.width(12.dp))
             }
             TvIconButton(Icon.Gear, stringResource(R.string.settings), onSettings)
         }
         Spacer(Modifier.height(48.dp))
-        Text(stringResource(R.string.home_title), fontSize = 39.sp, fontWeight = FontWeight.Bold, color = Palette.Text, letterSpacing = (-0.5).sp)
-        Spacer(Modifier.height(18.dp))
+        Text(stringResource(R.string.home_title), fontSize = Type.Hero, fontWeight = FontWeight.Bold, color = Palette.Text, letterSpacing = (-0.5).sp)
+        Spacer(Modifier.height(20.dp))
         // search history shows only while the text field or the suggestions themselves have focus, not the voice button
         var fieldFocused by remember { mutableStateOf(false) }
         var suggestionsFocused by remember { mutableStateOf(false) }
@@ -549,7 +549,7 @@ private fun HomeScreen(
                 Modifier.focusRequester(voiceFocus).onFocusChanged { voiceFocused = it.isFocused },
                 primary = true, large = true, icon = Icon.Mic,
             )
-            Spacer(Modifier.width(10.dp))
+            Spacer(Modifier.width(12.dp))
             TvTextField(
                 typed, { typed = it }, stringResource(R.string.search_hint),
                 Modifier.width(345.dp).onFocusChanged { fieldFocused = it.isFocused },
@@ -575,7 +575,7 @@ private fun HomeScreen(
             onRestoreFailed = { runCatching { voiceFocus.requestFocus() } },
             onOpenChange = { panelOpen = it },
             continueContent = { firstCard ->
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(14.dp), contentPadding = PaddingValues(vertical = 6.dp, horizontal = 4.dp)) {
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(16.dp), contentPadding = PaddingValues(vertical = 6.dp, horizontal = 4.dp)) {
                     itemsIndexed(history, key = { _, e -> "${e.item.trackerId}:${e.item.link}" }) { i, e ->
                         HistoryCard(e, progressOf(e), if (i == 0) Modifier.focusRequester(firstCard) else Modifier, onClick = { onResume(e) })
                     }
@@ -604,16 +604,16 @@ private fun ServerSetup() {
         Modifier
             .padding(top = 24.dp)
             .width(560.dp)
-            .background(Palette.Bg.copy(alpha = 0.82f), RoundedCornerShape(16.dp))
+            .background(Palette.Bg.copy(alpha = 0.82f), Radius.L)
             .padding(20.dp),
     ) {
-        Text(stringResource(R.string.server_setup_title), fontSize = 17.sp, fontWeight = FontWeight.Bold, color = Palette.Text)
+        Text(stringResource(R.string.server_setup_title), fontSize = Type.Body, fontWeight = FontWeight.Bold, color = Palette.Text)
         Spacer(Modifier.height(8.dp))
         Text(
             stringResource(if (launch != null) R.string.server_setup_start else R.string.server_setup_install, TORRSERVE_CODE),
-            fontSize = 13.sp, color = Palette.Muted, lineHeight = 19.sp,
+            fontSize = Type.Caption, color = Palette.Muted, lineHeight = Type.CaptionLine,
         )
-        Spacer(Modifier.height(14.dp))
+        Spacer(Modifier.height(16.dp))
         val open = launch
         if (open != null) {
             TvButton(stringResource(R.string.open_torrserve), { context.startActivity(open) }, primary = true)
@@ -627,12 +627,12 @@ private fun ServerSetup() {
 @Composable
 private fun RecentQueries(label: String, icon: Icon, queries: List<String>, onPick: (String) -> Unit) {
     if (queries.isEmpty()) return
-    Spacer(Modifier.height(10.dp))
+    Spacer(Modifier.height(12.dp))
     Row(verticalAlignment = Alignment.CenterVertically) {
         TvIcon(icon, Palette.Muted, 12.dp)
-        Spacer(Modifier.width(6.dp))
-        Text(label, fontSize = 11.sp, color = Palette.Muted, modifier = Modifier.width(62.dp))
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(7.dp), contentPadding = PaddingValues(vertical = 2.dp, horizontal = 2.dp)) {
+        Spacer(Modifier.width(8.dp))
+        Text(label, fontSize = Type.Caption, color = Palette.Muted, modifier = Modifier.width(62.dp))
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), contentPadding = PaddingValues(vertical = 2.dp, horizontal = 2.dp)) {
             items(queries, key = { it }) { q -> TvButton(q, { onPick(q) }) }
         }
     }
@@ -643,10 +643,10 @@ private fun HistoryCard(e: WatchEntry, progress: Progress?, modifier: Modifier =
     TvCard(onClick, modifier.width(202.dp)) {
         PosterImage(e.poster, shortTitle(e.item.title), 34.sp, Modifier.fillMaxWidth().height(90.dp))
         if (progress != null) ProgressLine(progress)
-        Column(Modifier.padding(horizontal = 11.dp, vertical = 9.dp)) {
-            Text(shortTitle(e.item.title), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Palette.Text, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Spacer(Modifier.height(3.dp))
-            Text("${e.fileName} · ${ago(e.watchedAt)}", fontSize = 10.sp, color = Palette.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+            Text(shortTitle(e.item.title), fontSize = Type.Caption, fontWeight = FontWeight.SemiBold, color = Palette.Text, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Spacer(Modifier.height(4.dp))
+            Text("${e.fileName} · ${ago(e.watchedAt)}", fontSize = Type.Caption, color = Palette.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
 }
@@ -681,7 +681,7 @@ private fun ResultsScreen(s: Screen.Results, onOpen: (TorrentItem) -> Unit) {
 
     Column(Modifier.fillMaxSize()) {
         Row(verticalAlignment = Alignment.Bottom) {
-            Text(s.query.label, fontSize = 28.sp, fontWeight = FontWeight.Bold, color = Palette.Text)
+            Text(s.query.label, fontSize = Type.Headline, fontWeight = FontWeight.Bold, color = Palette.Text)
             Spacer(Modifier.width(12.dp))
             Text(
                 when {
@@ -689,12 +689,12 @@ private fun ResultsScreen(s: Screen.Results, onOpen: (TorrentItem) -> Unit) {
                     items.isEmpty() -> stringResource(R.string.nothing_found)
                     else -> pluralStringResource(R.plurals.results_count, items.size, items.size) + " · $trackers"
                 },
-                fontSize = 13.sp,
+                fontSize = Type.Caption,
                 color = Palette.Muted,
                 modifier = Modifier.padding(bottom = 4.dp),
             )
         }
-        s.notes.forEach { Text(it, fontSize = 11.sp, color = Palette.Warn) }
+        s.notes.forEach { Text(it, fontSize = Type.Caption, color = Palette.Warn) }
         if (counts.size > 1) {
             Spacer(Modifier.height(12.dp))
             LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), contentPadding = PaddingValues(horizontal = 2.dp, vertical = 2.dp)) {
@@ -718,20 +718,20 @@ private fun ResultsScreen(s: Screen.Results, onOpen: (TorrentItem) -> Unit) {
 @Composable
 private fun ResultCard(item: TorrentItem, onClick: () -> Unit, modifier: Modifier = Modifier) {
     TvCard(onClick, modifier.fillMaxWidth()) {
-        Row(Modifier.padding(horizontal = 15.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
-                Text(item.title, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = Palette.Text, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                Spacer(Modifier.height(5.dp))
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(item.title, fontSize = Type.Caption, fontWeight = FontWeight.SemiBold, color = Palette.Text, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Spacer(Modifier.height(4.dp))
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     qualityOf(item.title)?.let { (q, c) -> Tag(q, c) }
                     Tag(stringResource(item.category.label))
-                    Text("${item.size} · ${item.tracker}", fontSize = 10.sp, color = Palette.Muted)
+                    Text("${item.size} · ${item.tracker}", fontSize = Type.Caption, color = Palette.Muted)
                 }
             }
-            Spacer(Modifier.width(18.dp))
+            Spacer(Modifier.width(20.dp))
             Column(horizontalAlignment = Alignment.End) {
-                Text("${item.seeds}", fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = seedColor(item.seeds))
-                Text(stringResource(R.string.seeds_label), fontSize = 9.sp, color = Palette.Muted)
+                Text("${item.seeds}", fontSize = Type.Title, fontWeight = FontWeight.ExtraBold, color = seedColor(item.seeds))
+                Text(stringResource(R.string.seeds_label), fontSize = Type.Caption, color = Palette.Muted)
             }
         }
     }
@@ -742,54 +742,54 @@ private fun LoadingScreen(s: Screen.Loading, onPlayNow: () -> Unit) {
     val focus = remember { FocusRequester() }
     LaunchedEffect(Unit) { focus.requestFocus() }
     Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.Center) {
-        Text(shortTitle(s.from.item.title), fontSize = 12.sp, color = Palette.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        Spacer(Modifier.height(6.dp))
-        Text(s.file.name, fontSize = 30.sp, fontWeight = FontWeight.ExtraBold, color = Palette.Text, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.width(700.dp))
+        Text(shortTitle(s.from.item.title), fontSize = Type.Caption, color = Palette.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Spacer(Modifier.height(8.dp))
+        Text(s.file.name, fontSize = Type.Display, fontWeight = FontWeight.ExtraBold, color = Palette.Text, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.width(700.dp))
         Spacer(Modifier.height(28.dp))
         val st = s.stats
         val progress = if (st != null && st.preloadSize > 0) (st.preloaded.toFloat() / st.preloadSize).coerceIn(0f, 1f) else 0f
         Row(Modifier.width(570.dp)) {
-            Text(stringResource(R.string.preparing), fontSize = 12.sp, color = Palette.Text)
+            Text(stringResource(R.string.preparing), fontSize = Type.Caption, color = Palette.Text)
             Spacer(Modifier.weight(1f))
             Text(
                 if (st != null && st.preloadSize > 0) stringResource(R.string.buffer_of, formatSize(st.preloaded), formatSize(st.preloadSize)) else stringResource(R.string.connecting),
-                fontSize = 12.sp,
+                fontSize = Type.Caption,
                 color = Palette.Muted,
             )
         }
         Spacer(Modifier.height(8.dp))
-        Box(Modifier.width(570.dp).height(6.dp).background(Palette.Glass, RoundedCornerShape(3.dp))) {
-            Box(Modifier.fillMaxWidth(progress).height(6.dp).background(Palette.Accent, RoundedCornerShape(3.dp)))
+        Box(Modifier.width(570.dp).height(6.dp).background(Palette.Glass, Radius.S)) {
+            Box(Modifier.fillMaxWidth(progress).height(6.dp).background(Palette.Accent, Radius.S))
         }
-        Spacer(Modifier.height(18.dp))
+        Spacer(Modifier.height(20.dp))
         st?.let { StatsBlock(it) }
         Spacer(Modifier.height(24.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
             TvButton(stringResource(R.string.watch_now), onPlayNow, Modifier.focusRequester(focus), primary = true, large = true, icon = Icon.Play)
             Spacer(Modifier.width(12.dp))
-            Text(stringResource(R.string.player_auto), fontSize = 11.sp, color = Palette.Muted)
+            Text(stringResource(R.string.player_auto), fontSize = Type.Caption, color = Palette.Muted)
         }
     }
 }
 
 @Composable
 private fun StatsBlock(st: TorrentStats) {
-    Row(horizontalArrangement = Arrangement.spacedBy(42.dp)) {
+    Row(horizontalArrangement = Arrangement.spacedBy(44.dp)) {
         Stat("${st.seeders}", stringResource(R.string.seeds_label), seedColor(st.seeders))
         Stat("${st.activePeers} / ${st.totalPeers}", stringResource(R.string.peers_label))
         Stat(formatSpeed(st.speedBytes), stringResource(R.string.speed_label))
     }
     if (st.seeders == 0) {
         Spacer(Modifier.height(8.dp))
-        Text(stringResource(R.string.no_seeds), fontSize = 11.sp, color = Palette.Accent)
+        Text(stringResource(R.string.no_seeds), fontSize = Type.Caption, color = Palette.Accent)
     }
 }
 
 @Composable
 private fun Stat(value: String, label: String, color: Color = Palette.Text) {
     Column {
-        Text(value, fontSize = 24.sp, fontWeight = FontWeight.ExtraBold, color = color)
-        Text(label, fontSize = 10.sp, color = Palette.Muted)
+        Text(value, fontSize = Type.Headline, fontWeight = FontWeight.ExtraBold, color = color)
+        Text(label, fontSize = Type.Caption, color = Palette.Muted)
     }
 }
 

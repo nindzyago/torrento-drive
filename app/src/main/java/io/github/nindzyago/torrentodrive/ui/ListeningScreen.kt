@@ -194,30 +194,30 @@ fun ListeningScreen(warmup: VoiceWarmup, onResult: (String) -> Unit, onCancel: (
                 Phase.Done -> stringResource(R.string.listen_done)
                 Phase.Failed -> stringResource(R.string.listen_failed)
             },
-            fontSize = 26.sp,
+            fontSize = Type.Headline,
             fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
             color = Color.White,
         )
         Spacer(Modifier.height(24.dp))
         // audio level: if the bar doesn't move, audio from the remote isn't getting through
         val fraction = ((level + 2f) / 12f).coerceIn(0f, 1f)
-        Box(Modifier.width(600.dp).height(16.dp).background(Color(0xFF2A303C), RoundedCornerShape(8.dp))) {
+        Box(Modifier.width(600.dp).height(16.dp).background(Color(0xFF2A303C), Radius.S)) {
             Box(
                 Modifier
                     .fillMaxWidth(if (phase == Phase.Failed) 0f else fraction)
                     .fillMaxHeight()
-                    .background(if (maxLevel >= SILENCE_RMS) Accent else Muted, RoundedCornerShape(8.dp))
+                    .background(if (maxLevel >= SILENCE_RMS) Accent else Muted, Radius.S)
             )
         }
         Spacer(Modifier.height(24.dp))
-        Text(partial.ifEmpty { " " }, fontSize = 22.sp, color = Color.White)
+        Text(partial.ifEmpty { " " }, fontSize = Type.Title, color = Color.White)
         if (phase == Phase.Done) {
             Spacer(Modifier.height(12.dp))
-            Text(stringResource(R.string.listen_searching, SearchQuery.parse(partial).label), fontSize = 14.sp, color = Palette.AccentSoft)
+            Text(stringResource(R.string.listen_searching, SearchQuery.parse(partial).label), fontSize = Type.Caption, color = Palette.AccentSoft)
         }
         failure?.let {
             Spacer(Modifier.height(16.dp))
-            Text(it, fontSize = 20.sp, color = Accent)
+            Text(it, fontSize = Type.Title, color = Accent)
             Spacer(Modifier.height(24.dp))
             val focus = remember { FocusRequester() }
             LaunchedEffect(Unit) { focus.requestFocus() }
@@ -226,7 +226,7 @@ fun ListeningScreen(warmup: VoiceWarmup, onResult: (String) -> Unit, onCancel: (
         Spacer(Modifier.height(24.dp))
         Text(
             if (attempt > 1 && phase != Phase.Failed) stringResource(R.string.attempt_of, attempt, MAX_ATTEMPTS) else stringResource(R.string.key_back),
-            fontSize = 14.sp,
+            fontSize = Type.Caption,
             color = Muted,
         )
     }

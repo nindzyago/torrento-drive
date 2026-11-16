@@ -123,7 +123,7 @@ internal fun HomePanel(
             }
             // the panel's padding plus the tab's pill sticks out to the left so the first title lines up with the screen edge
             .offset(x = (-24).dp)
-            .background(if (open) Palette.Bg.copy(alpha = 0.82f) else Color.Transparent, RoundedCornerShape(16.dp))
+            .background(if (open) Palette.Bg.copy(alpha = 0.82f) else Color.Transparent, Radius.L)
             .padding(horizontal = 12.dp, vertical = 8.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -154,11 +154,11 @@ internal fun HomePanel(
         ) {
             // Up from any card goes back to the open tab, not to whatever sits above it on the screen
             Column(Modifier.focusProperties { exit = { if (it == FocusDirection.Up) tabFocus.getValue(tab) else FocusRequester.Default } }.focusGroup()) {
-                Spacer(Modifier.height(10.dp))
+                Spacer(Modifier.height(12.dp))
                 val kind = tab.kind
                 if (kind == null) {
                     if (continueEmpty) {
-                        Text(stringResource(R.string.history_empty), fontSize = 12.sp, color = Palette.Muted, modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp))
+                        Text(stringResource(R.string.history_empty), fontSize = Type.Caption, color = Palette.Muted, modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp))
                     } else {
                         continueContent(firstContinue)
                     }
@@ -176,7 +176,7 @@ private fun PanelTabHandle(modifier: Modifier, label: String, selected: Boolean,
     var focused by remember { mutableStateOf(false) }
     Row(
         modifier
-            .clip(RoundedCornerShape(16.dp))
+            .clip(Radius.L)
             .onFocusChanged {
                 focused = it.isFocused
                 if (it.isFocused) onFocus()
@@ -189,7 +189,7 @@ private fun PanelTabHandle(modifier: Modifier, label: String, selected: Boolean,
                 },
             )
             .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 6.dp),
+            .padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         SectionTitle(label)
@@ -218,13 +218,13 @@ private fun ShelvesTab(
             item { TvButton(stringResource(R.string.shelf_all), { tracker = null }, selected = tracker == null) }
             items(trackers, key = { it }) { t -> TvButton(t, { tracker = t }, selected = tracker == t) }
         }
-        Spacer(Modifier.height(6.dp))
+        Spacer(Modifier.height(8.dp))
     }
-    view.notes.forEach { Text(it, fontSize = 11.sp, color = Palette.Warn, modifier = Modifier.padding(horizontal = 4.dp)) }
+    view.notes.forEach { Text(it, fontSize = Type.Caption, color = Palette.Warn, modifier = Modifier.padding(horizontal = 4.dp)) }
     if (shown.isEmpty()) {
         Text(
             stringResource(if (view.loading) R.string.shelves_loading else R.string.shelves_empty),
-            fontSize = 12.sp, color = Palette.Muted, modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+            fontSize = Type.Caption, color = Palette.Muted, modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
         )
         return
     }
@@ -236,15 +236,15 @@ private fun ShelvesTab(
     LazyColumn(
         state = column,
         modifier = Modifier.heightIn(max = 300.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
         contentPadding = PaddingValues(vertical = 4.dp),
     ) {
         itemsIndexed(shown, key = { _, s -> "${s.tracker.id}:${s.section.id}" }) { si, shelf ->
             Column {
                 Text(
                     "${shelf.tracker.name} · ${shelf.section.title}",
-                    fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Palette.Muted,
-                    modifier = Modifier.padding(start = 4.dp, bottom = 6.dp),
+                    fontSize = Type.Caption, fontWeight = FontWeight.SemiBold, color = Palette.Muted,
+                    modifier = Modifier.padding(start = 4.dp, bottom = 8.dp),
                 )
                 val restoreIndex = if (si == restoreShelf) shelf.items.indexOfFirst { itemKey(it) == restore?.itemKey } else -1
                 val row = rememberLazyListState(initialFirstVisibleItemIndex = restoreIndex.coerceAtLeast(0))
@@ -269,13 +269,13 @@ private fun ShelfCard(item: TorrentItem, poster: String?, modifier: Modifier, on
     TvCard(onClick, modifier.width(168.dp)) {
         val title = shortTitle(item.title)
         PosterImage(poster, title, 30.sp, Modifier.fillMaxWidth().height(74.dp))
-        Column(Modifier.padding(horizontal = 10.dp, vertical = 8.dp)) {
-            Text(title, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Palette.Text, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Spacer(Modifier.height(3.dp))
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+        Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+            Text(title, fontSize = Type.Caption, fontWeight = FontWeight.SemiBold, color = Palette.Text, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Spacer(Modifier.height(4.dp))
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 qualityOf(item.title)?.let { (q, c) -> Tag(q, c) }
-                Text("${item.seeds}", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = seedColor(item.seeds))
-                Text("· ${item.size}", fontSize = 10.sp, color = Palette.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text("${item.seeds}", fontSize = Type.Caption, fontWeight = FontWeight.Bold, color = seedColor(item.seeds))
+                Text("· ${item.size}", fontSize = Type.Caption, color = Palette.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
     }

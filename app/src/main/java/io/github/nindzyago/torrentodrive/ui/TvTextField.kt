@@ -53,7 +53,7 @@ fun TvTextField(
         value = value,
         onValueChange = onValueChange,
         singleLine = true,
-        textStyle = TextStyle(color = Color.White, fontSize = 14.sp),
+        textStyle = TextStyle(color = Color.White, fontSize = Type.Caption),
         cursorBrush = SolidColor(Accent),
         visualTransformation = if (password) PasswordVisualTransformation() else VisualTransformation.None,
         keyboardOptions = KeyboardOptions(
@@ -72,15 +72,15 @@ fun TvTextField(
                     else -> false
                 }
             }
-            .background(Palette.Glass, RoundedCornerShape(22.dp))
-            .border(if (focused) 2.dp else 1.dp, if (focused) Accent else Palette.Line, RoundedCornerShape(22.dp))
-            .padding(horizontal = 16.dp, vertical = 13.dp),
+            .background(Palette.Glass, RoundedCornerShape(50))
+            .border(if (focused) 2.dp else 1.dp, if (focused) Accent else Palette.Line, RoundedCornerShape(50))
+            .padding(horizontal = 16.dp, vertical = 12.dp),
         decorationBox = { inner ->
             androidx.compose.foundation.layout.Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
                 TvIcon(Icon.Search, Muted, 15.dp)
-                androidx.compose.foundation.layout.Spacer(Modifier.padding(start = 9.dp))
+                androidx.compose.foundation.layout.Spacer(Modifier.padding(start = 8.dp))
                 androidx.compose.foundation.layout.Box {
-                    if (value.isEmpty()) Text(placeholder, color = Muted, fontSize = 14.sp)
+                    if (value.isEmpty()) Text(placeholder, color = Muted, fontSize = Type.Caption)
                     inner()
                 }
             }

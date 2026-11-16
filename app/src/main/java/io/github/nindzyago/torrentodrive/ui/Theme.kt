@@ -33,7 +33,7 @@ internal object Palette {
     val Bg = Color(0xFF0B0C10)
     val Surface = Color(0xE6181A20)
     val SurfaceHi = Color(0xFF20232C)
-    val Line = Color(0x24FFFFFF)
+    val Line = Color(0x4DFFFFFF) // 30 % white: 3:1 against Bg for resting borders (design review R16)
     val Glass = Color(0x12FFFFFF)
     val Text = Color(0xFFF2F3F5)
     val Muted = Color(0xFFA3A8B2)
@@ -44,10 +44,28 @@ internal object Palette {
     val Warn = Color(0xFFFFB547)
 }
 
+/** Type scale (design review R14): six sizes, nothing below 14sp on a 10-foot screen. */
+internal object Type {
+    val Caption = 14.sp
+    val Body = 17.sp
+    val Title = 20.sp
+    val Headline = 26.sp
+    val Display = 34.sp
+    val Hero = 42.sp
+    val CaptionLine = 20.sp
+}
+
+/** Corner radii (design review R15): small, medium, large; pills use RoundedCornerShape(50). */
+internal object Radius {
+    val S = RoundedCornerShape(8.dp)
+    val M = RoundedCornerShape(12.dp)
+    val L = RoundedCornerShape(16.dp)
+}
+
 internal val Accent = Palette.Accent
 internal val Muted = Palette.Muted
 
-private val CardShape = RoundedCornerShape(11.dp)
+private val CardShape = Radius.M
 
 /** Remote-friendly card: when focused, slightly lighter, with an accent border and a slight scale-up. */
 @Composable
@@ -97,7 +115,7 @@ internal fun TvButton(
             TvIcon(icon, Palette.Text, if (large) 17.dp else 14.dp)
             androidx.compose.foundation.layout.Spacer(Modifier.padding(start = if (large) 9.dp else 6.dp))
         }
-        Text(text, fontSize = if (large) 15.sp else 12.sp, fontWeight = if (large) FontWeight.SemiBold else FontWeight.Medium, maxLines = 1, softWrap = false)
+        Text(text, fontSize = if (large) Type.Body else Type.Caption, fontWeight = if (large) FontWeight.SemiBold else FontWeight.Medium, maxLines = 1, softWrap = false)
     }
 }
 
@@ -126,12 +144,12 @@ internal fun TvIconButton(icon: Icon, description: String, onClick: () -> Unit, 
 internal fun Tag(text: String, color: Color = Palette.Muted) {
     Text(
         text,
-        fontSize = 10.sp,
+        fontSize = Type.Caption,
         fontWeight = FontWeight.Medium,
         color = color,
         modifier = Modifier
-            .background(color.copy(alpha = 0.15f), RoundedCornerShape(5.dp))
-            .padding(horizontal = 6.dp, vertical = 1.dp),
+            .background(color.copy(alpha = 0.15f), Radius.S)
+            .padding(horizontal = 8.dp, vertical = 1.dp),
     )
 }
 
@@ -144,7 +162,7 @@ internal fun seedColor(seeds: Int): Color = when {
 
 @Composable
 internal fun SectionTitle(text: String) {
-    Text(text, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = Palette.Text)
+    Text(text, fontSize = Type.Caption, fontWeight = FontWeight.SemiBold, color = Palette.Text)
 }
 
 /**
